@@ -3,6 +3,7 @@ appengine-json-rest
 Create a REST-ful JSON api for existing AppEngine db.Model classes.
 
 Setup Features:
+---------------
   * See docs for for create_application() for details.
   * Create your REST URL at any location in your App Engine app.
   * Register models individually (see register_model())
@@ -13,6 +14,7 @@ Setup Features:
     authentication - be sure to set up your app.yaml property, too).
 
 Usage:
+------
   * Create model:
     * Method: HTTP POST
     * URL: /rest/ModelName
@@ -37,6 +39,7 @@ Usage:
     * URL: /rest/metadata/ModelName
 
 JSON Output Formatting:
+-----------------------
     db.DateProperty, db.DateTimeProperty, and db.TimeProperty classes are
     returned as ISO 8601 format. See http://en.wikipedia.org/wiki/ISO_8601
 
@@ -59,6 +62,8 @@ JSON Output Formatting:
         type: the class name of the Exception raised during failure
 
 
+Thanks:
+-------
 Several ideas and snippets have been borrowed from other open-source projects.
 
 Special thanks to the developers of:
