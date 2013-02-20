@@ -14,25 +14,27 @@ Setup Features:
 
 Usage:
   * Create model:
-     Method: HTTP POST
-     URL: /rest/ModelName
+    * Method: HTTP POST
+    * URL: /rest/ModelName
   * Read model:
-     Method: HTTP GET
-     URL: /rest/ModelName/id
+    * Method: HTTP GET
+    * URL: /rest/ModelName/id
   * Update model:
-     Method: HTTP PUT
-     URL: /rest/ModelName/id
+    * Method: HTTP PUT
+    * URL: /rest/ModelName/id
   * Delete model:
-     Method: HTTP DELETE
-     URL: /rest/ModelName/id
+    * Method: HTTP DELETE
+    * URL: /rest/ModelName/id
   * Search for and page through model:
-     Method: HTTP GET
-     URL: /rest/ModelName/search
-     QueryString Parameters:
-       cursor:
-
-  * List names of available models at /rest/metadata
-  * Query model-specific fields, types, and other data: /rest/metadata/ModelName
+    * Method: HTTP GET
+    * URL: /rest/ModelName/search
+    * QueryString Parameters:
+  * List names of available models:
+    * Method: HTTP GET
+    * URL: /rest/metadata
+  * Query model-specific fields, types, and other data: 
+    * Method: HTTP GET
+    * URL: /rest/metadata/ModelName
 
 JSON Output Formatting:
     db.DateProperty, db.DateTimeProperty, and db.TimeProperty classes are
