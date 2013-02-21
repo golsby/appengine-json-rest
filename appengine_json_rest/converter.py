@@ -3,35 +3,59 @@ from google.appengine.ext import db
 from dateutil import parser as date_parser
 
 
-def date_to_str(date):
+def from_date(date):
     return date.isoformat()
 
 
-def str_to_date(date_string):
+def to_date(date_string):
     return date_parser.parse(date_string).date()
 
 
-def datetime_to_str(d):
+def from_datetime(d):
     return d.isoformat()
 
 
-def str_to_datetime(s):
+def to_datetime(s):
     return date_parser.parse(s)
 
 
-def time_to_str(t):
+def from_time(t):
     return t.isoformat()
 
 
-def str_to_time(s):
+def to_time(s):
     return date_parser.parse(s).time()
 
 
+def from_geopt(p):
+    if p:
+        return {'lat':p.lat,'lon':p.lon}
+    else:
+        return None
+
+
+def to_geopt(o):
+    if type(o) is dict:
+        return db.GeoPt(o.get('lat', 0), o.get('lon', 0))
+    if type(o) is list:
+        return db.GeoPt(float(o[0]), float(o[1]))
+
+    raise TypeError('Conversion to db.GeoPt expected dict or list; got {0}'.format(type(o)))
+
+
 property_converters = {
-    db.DateTimeProperty: (datetime_to_str, str_to_datetime),
-    db.DateProperty: (date_to_str, str_to_date),
-    db.TimeProperty: (time_to_str, str_to_time),
+    db.DateTimeProperty: (from_datetime, to_datetime),
+    db.DateProperty: (from_date, to_date),
+    db.TimeProperty: (from_time, to_time),
     db.FloatProperty: (float, float),
+    # db.ByteStringProperty (byte array)
+    # db.BlobProperty (byte array)
+    db.GeoPtProperty: (from_geopt, to_geopt),
+    # db.RatingProperty: (long)
+    # db.ReferenceProperty (string?)
+    # blobstore.BlobReferenceProperty
+    # db.ListProperty
+    # db.StringListProperty
 }
 
 
