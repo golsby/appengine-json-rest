@@ -2,6 +2,10 @@ appengine-json-rest
 ===================
 Create a REST-ful JSON api for existing AppEngine db.Model classes.
 
+Sample Implementation:
+----------------------
+A running AppEngine project that you can test locally is avialable at https://github.com/golsby/appengine-json-rest-sample
+
 Setup Features:
 ---------------
   * See docs for for create_application() for details.
