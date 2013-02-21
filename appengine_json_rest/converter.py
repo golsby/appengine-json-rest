@@ -8,13 +8,29 @@ def date_to_str(date):
 
 
 def str_to_date(date_string):
-    return date_parser.parse(date_string)
+    return date_parser.parse(date_string).date()
+
+
+def datetime_to_str(d):
+    return d.isoformat()
+
+
+def str_to_datetime(s):
+    return date_parser.parse(s)
+
+
+def time_to_str(t):
+    return t.isoformat()
+
+
+def str_to_time(s):
+    return date_parser.parse(s).time()
 
 
 property_converters = {
-    db.DateTimeProperty: (date_to_str, str_to_date),
+    db.DateTimeProperty: (datetime_to_str, str_to_datetime),
     db.DateProperty: (date_to_str, str_to_date),
-    db.TimeProperty: (date_to_str, str_to_date),
+    db.TimeProperty: (time_to_str, str_to_time),
     db.FloatProperty: (float, float),
 }
 

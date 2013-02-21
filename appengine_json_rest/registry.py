@@ -3,8 +3,8 @@ import sys
 
 from google.appengine.ext import db
 
-from mcneel.appengine.json_rest.converter import DictionaryConverter
-from mcneel.appengine.json_rest.errors import ModelNotRegisteredException, ApiFailureException
+from converter import DictionaryConverter
+from errors import ModelNotRegisteredException, ApiFailureException
 
 
 __author__ = 'Brian'
