@@ -64,6 +64,7 @@ property_converters = {
 
     # Unsupported Types
     # TODO: Support these unsupported types.
+    # TODO: Updated documentation as support comes!
     # db.ReferenceProperty (string?)
     # db.ListProperty
     # db.StringListProperty

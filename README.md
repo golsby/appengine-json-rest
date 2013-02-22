@@ -66,6 +66,51 @@ JSON Output Formatting:
         type: the class name of the Exception raised during failure
 
 
+Currently Supported Types:
+--------------------------
+**Explicitly Supported Types::**
+(Type coersion is performed to convert input of the wrong type into the correct type)
+  * db.DateTimeProperty: ISO 8601 format
+  * datetime.datetime: ISO 8601 format
+  * db.DateProperty: ISO 8601 format
+  * db.TimeProperty: ISO 8601 format
+  * db.FloatProperty: float
+  * db.GeoPtProperty: {"lat":float,"lon":float}
+  * datastore_types.GeoPt: {"lat":float,"lon":float}
+
+**Implicitly Supported Types:**
+(If you send a type that db.Model likes, it will be stored, otherwise an Exception is raised.
+  * datastore_types.Text: unicode
+  * db.TextProperty: unicode
+  * datastore_types.Category: unicode
+  * db.CategoryProperty: unicode
+  * datastore_types.Email: unicode
+  * db.EmailProperty: unicode
+  * datastore_types.Link: unicode
+  * db.LinkProperty: unicode
+  * datastore_types.PhoneNumber: unicode
+  * db.PhoneNumberProperty: unicode
+  * datastore_types.PostalAddress: unicode
+  * db.PostalAddressProperty: unicode
+  * datastore_types.Rating: int
+  * db.RatingProperty: int
+
+**NOT Supported Types:**
+  * db.ReferenceProperty
+  * db.ListProperty
+  * db.StringListProperty
+  * db.Key
+  * blobstore.BlobKey
+  * blobstore.BlobReferenceProperty
+  * users.User
+  * datastore_types.Blob
+  * db.BlobProperty
+  * datastore_types.ByteString
+  * db.ByteStringProperty
+  * datastore_types.IM
+  * db.IMProperty
+
+
 Thanks:
 -------
 Several ideas and snippets have been borrowed from other open-source projects.
