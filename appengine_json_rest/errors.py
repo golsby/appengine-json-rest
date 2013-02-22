@@ -1,6 +1,10 @@
 __author__ = 'Brian'
 
 
+class ObjectMissingException(Exception):
+    pass
+
+
 class ApiFailureException(Exception):
     def __init__(self, value):
         self.value = value
