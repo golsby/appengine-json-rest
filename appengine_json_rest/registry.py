@@ -4,7 +4,7 @@ import sys
 from google.appengine.ext import db
 
 from converter import DictionaryConverter
-from errors import ModelNotRegisteredException, ApiFailureException
+from errors import ModelNotRegisteredException, ObjectMissingException
 
 
 __author__ = 'Brian'
@@ -104,13 +104,13 @@ def get_registered_model_instance(model_name, key):
         try:
             model = model_class.get_by_id(id_)
             if not model:
-                raise ApiFailureException('{0} with id {1} not found'.format(model_name, id_))
+                raise ObjectMissingException('{0} with id {1} not found'.format(model_name, id_))
         except:
-            raise ApiFailureException('{0} with id {1} not found'.format(model_name, id_))
+            raise ObjectMissingException('{0} with id {1} not found'.format(model_name, id_))
     except ValueError:
         try:
             model = model_class.get(key)
         except:
-            raise ApiFailureException('{0} with key {1} not found'.format(model_name, key))
+            raise ObjectMissingException('{0} with key {1} not found'.format(model_name, key))
 
     return model, converter
