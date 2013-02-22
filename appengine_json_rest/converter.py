@@ -4,6 +4,8 @@ from google.appengine.api import datastore_types
 from dateutil import parser as date_parser
 import datetime
 
+FROM_PROPERTY = 0
+TO_PROPERTY = 1
 
 def from_date(date):
     return date.isoformat()
@@ -53,6 +55,10 @@ def to_byte_array(s):
     pass
 
 
+def identity(o):
+    return o
+
+
 property_converters = {
     db.DateTimeProperty: (from_datetime, to_datetime),
     datetime.datetime: (from_datetime, to_datetime),
@@ -97,6 +103,16 @@ property_converters = {
 }
 
 
+def get_property_converter_function(direction, property_type):
+    if property_type in property_converters:
+        (from_func, to_func) = property_converters[property_type]
+        if direction == FROM_PROPERTY:
+            return from_func
+        else:
+            return to_func
+
+    return identity
+
 class UnhandledPropertyError(Exception):
     pass
 
@@ -113,31 +129,23 @@ class DictionaryConverter(object):
     handlers.JsonHandler will convert between the dict format
     from this class and a JSON string.
     '''
-    def __type_from_property(self, model, prop):
-        value = getattr(model, prop.name)
-        if type(prop) in property_converters:
-            return property_converters[type(prop)][0](value)
-
-        return value
-
-    def __property_from_type(self, prop, value):
+    def __convert_property(self, direction, prop, value):
         if type(prop) is db.ListProperty:
             result = []
-            fn = None
-            if prop.item_type in property_converters:
-                fn = property_converters[prop.item_type][1]
-                for item in value:
-                    result.append(fn(item))
-                return result
-            else:
-                return value
+            fn = get_property_converter_function(direction, prop.item_type)
+            for item in value:
+                result.append(fn(item))
+            return result
 
-        if type(prop) in property_converters:
-            fn = property_converters[type(prop)][1]
-            newval = fn(value)
-            return newval
+        fn = get_property_converter_function(direction, type(prop))
+        return fn(value)
 
-        return value
+    def __type_from_property(self, model, prop):
+        value = getattr(model, prop.name)
+        return self.__convert_property(FROM_PROPERTY, prop, value)
+
+    def __property_from_type(self, prop, value):
+        return self.__convert_property(TO_PROPERTY, prop, value)
 
     # HTTP GET
     def read_model(self, model):
