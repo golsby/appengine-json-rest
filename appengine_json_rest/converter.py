@@ -1,6 +1,8 @@
 __author__ = 'Brian'
 from google.appengine.ext import db
+from google.appengine.api import datastore_types
 from dateutil import parser as date_parser
+import datetime
 
 
 def from_date(date):
@@ -43,19 +45,54 @@ def to_geopt(o):
     raise TypeError('Conversion to db.GeoPt expected dict or list; got {0}'.format(type(o)))
 
 
+def from_byte_array(b):
+    pass
+
+
+def to_byte_array(s):
+    pass
+
+
 property_converters = {
     db.DateTimeProperty: (from_datetime, to_datetime),
+    datetime.datetime: (from_datetime, to_datetime),
     db.DateProperty: (from_date, to_date),
     db.TimeProperty: (from_time, to_time),
     db.FloatProperty: (float, float),
-    # db.ByteStringProperty (byte array)
-    # db.BlobProperty (byte array)
     db.GeoPtProperty: (from_geopt, to_geopt),
-    # db.RatingProperty: (long)
+    datastore_types.GeoPt: (from_geopt, to_geopt),
+
+    # Unsupported Types
+    # TODO: Support these unsupported types.
     # db.ReferenceProperty (string?)
-    # blobstore.BlobReferenceProperty
     # db.ListProperty
     # db.StringListProperty
+    # db.Key
+    # blobstore.BlobKey
+    # blobstore.BlobReferenceProperty
+    # users.User
+    # datastore_types.Blob
+    # db.BlobProperty (byte array)
+    # datastore_types.ByteString
+    # db.ByteStringProperty (byte array)
+    # datastore_types.IM (tuple: (protocol(unicode), address(unicode)))
+    # db.IMProperty (tuple: (protocol(unicode), address(unicode)))
+
+    # Implicitly supported types
+    # datastore_types.Text (unicode)
+    # db.TextProperty (unicode)
+    # datastore_types.Category (unicode)
+    # db.CategoryProperty (unicode)
+    # datastore_types.Email (unicode)
+    # db.EmailProperty (unicode)
+    # datastore_types.Link (unicode)
+    # db.LinkProperty (unicode)
+    # datastore_types.PhoneNumber (unicode)
+    # db.PhoneNumberProperty (unicode)
+    # datastore_types.PostalAddress (unicode)
+    # db.PostalAddressProperty (unicode)
+    # datastore_types.Rating (int)
+    # db.RatingProperty (int)
 }
 
 
@@ -83,6 +120,17 @@ class DictionaryConverter(object):
         return value
 
     def __property_from_type(self, prop, value):
+        if type(prop) is db.ListProperty:
+            result = []
+            fn = None
+            if prop.item_type in property_converters:
+                fn = property_converters[prop.item_type][1]
+                for item in value:
+                    result.append(fn(item))
+                return result
+            else:
+                return value
+
         if type(prop) in property_converters:
             fn = property_converters[type(prop)][1]
             newval = fn(value)
