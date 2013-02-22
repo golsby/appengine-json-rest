@@ -68,7 +68,8 @@ JSON Output Formatting:
 
 Currently Supported Types:
 --------------------------
-**Explicitly Supported Types::**
+**Explicitly Supported Types:**
+
 (Type coersion is performed to convert input of the wrong type into the correct type)
   * db.DateTimeProperty: ISO 8601 format
   * datetime.datetime: ISO 8601 format
@@ -79,6 +80,7 @@ Currently Supported Types:
   * datastore_types.GeoPt: {"lat":float,"lon":float}
 
 **Implicitly Supported Types:**
+
 (If you send a type that db.Model likes, it will be stored, otherwise an Exception is raised.
   * datastore_types.Text: unicode
   * db.TextProperty: unicode
