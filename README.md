@@ -111,7 +111,7 @@ Currently Supported Types:
   * db.IMProperty
 
 
-Thanks:
+Thank You:
 -------
 Several ideas and snippets have been borrowed from other open-source projects.
 
