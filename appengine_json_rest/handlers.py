@@ -9,9 +9,10 @@ from registry import \
     get_registered_model_type,\
     get_registered_model_instance
 from errors import \
-    HttpsRequiredException, \
-    ModelNotRegisteredException, \
-    ApiFailureException
+    HttpsRequiredError, \
+    ModelNotRegisteredError, \
+    ApiFailureError, \
+    AuthenticationRequiredError
 
 
 __author__ = 'Brian'
@@ -44,10 +45,15 @@ def authenticate(function):
         localhost = self.request.host.startswith('localhost')
         if __require_https and not localhost:
             if os.environ.get("HTTPS") != 'on':
-                raise HttpsRequiredException()
+                raise HttpsRequiredError()
 
         if __authenticator:
-            __authenticator(self.request)
+            try:
+                __authenticator(self.request)
+            except AuthenticationRequiredError:
+                self.error(401)
+                return
+
         return function(*args, **kwargs)
     return decorated
 
@@ -126,7 +132,7 @@ class JsonHandler(webapp.RequestHandler):
 
         self.indent = 4
 
-        if issubclass(exception.__class__, ApiFailureException):
+        if issubclass(exception.__class__, ApiFailureError):
             self.api_fail(message=exception.value, exception_class_name=exception.__class__.__name__)
             return
         else:
@@ -316,7 +322,7 @@ class SearchHandler(JsonHandler):
         try:
             (modelClass, converter) = get_registered_model_type(model_name)
         except TypeError:
-            raise ModelNotRegisteredException(model_name)
+            raise ModelNotRegisteredError(model_name)
 
         data = {
             'models': []
@@ -344,7 +350,7 @@ class SearchHandler(JsonHandler):
                     limit = int(self.request.get(arg))
                     continue
                 except ValueError:
-                    raise ApiFailureException('limit parameter must be an integer')
+                    raise ApiFailureError('limit parameter must be an integer')
 
         models = query.fetch(limit)
         data['cursor'] = None

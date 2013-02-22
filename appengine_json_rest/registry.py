@@ -4,7 +4,7 @@ import sys
 from google.appengine.ext import db
 
 from converter import DictionaryConverter
-from errors import ModelNotRegisteredException, ObjectMissingException
+from errors import ModelNotRegisteredError, ObjectMissingError
 
 
 __author__ = 'Brian'
@@ -91,7 +91,7 @@ def get_registered_model_names():
 def get_registered_model_type(model_name):
     (model_class, converter) = __registered_models.get(model_name)
     if not model_class:
-        raise ModelNotRegisteredException(model_name)
+        raise ModelNotRegisteredError(model_name)
 
     return model_class, converter
 
@@ -104,13 +104,13 @@ def get_registered_model_instance(model_name, key):
         try:
             model = model_class.get_by_id(id_)
             if not model:
-                raise ObjectMissingException('{0} with id {1} not found'.format(model_name, id_))
+                raise ObjectMissingError('{0} with id {1} not found'.format(model_name, id_))
         except:
-            raise ObjectMissingException('{0} with id {1} not found'.format(model_name, id_))
+            raise ObjectMissingError('{0} with id {1} not found'.format(model_name, id_))
     except ValueError:
         try:
             model = model_class.get(key)
         except:
-            raise ObjectMissingException('{0} with key {1} not found'.format(model_name, key))
+            raise ObjectMissingError('{0} with key {1} not found'.format(model_name, key))
 
     return model, converter

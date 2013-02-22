@@ -1,11 +1,11 @@
 __author__ = 'Brian'
 
 
-class ObjectMissingException(Exception):
+class ObjectMissingError(Exception):
     pass
 
 
-class ApiFailureException(Exception):
+class ApiFailureError(Exception):
     def __init__(self, value):
         self.value = value
 
@@ -13,20 +13,26 @@ class ApiFailureException(Exception):
         return repr(self.value)
 
 
-class HttpsRequiredException(ApiFailureException):
+class HttpsRequiredError(ApiFailureError):
     def __init__(self):
         self.value = "https is required"
+
     def __str__(self):
         return repr(self.value)
 
 
-class AuthenticationFailedException(ApiFailureException):
+class AuthenticationFailedError(ApiFailureError):
     def __init__(self):
         self.value = "authentication failed"
+
     def __str__(self):
         return repr(self.value)
 
 
-class ModelNotRegisteredException(ApiFailureException):
+class AuthenticationRequiredError(ApiFailureError):
+    pass
+
+
+class ModelNotRegisteredError(ApiFailureError):
     def __init__(self, value):
-        super(ModelNotRegisteredException, self).__init__('Model "{0}" not registered'.format(value))
+        super(ModelNotRegisteredError, self).__init__('Model "{0}" not registered'.format(value))
