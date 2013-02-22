@@ -234,8 +234,13 @@ class SingleModelHandler(JsonHandler):
         json_string = urllib.unquote(self.request.body)
         values = json.loads(json_string)
 
-        id = converter.update_model(model, values)
-        self.api_success(key)
+        converter.update_model(model, values)
+        try:
+            id_ = int(key)
+        except TypeError:
+            id_ = key
+
+        self.api_success(id_)
 
     @authenticate
     def delete(self, modelName, key):
@@ -252,7 +257,12 @@ class SingleModelHandler(JsonHandler):
         """
         (model, converter) = get_registered_model_instance(modelName, key)
         model.delete()
-        self.api_success(key)
+        try:
+            id_ = int(key)
+        except TypeError:
+            id_ = key
+
+        self.api_success(id_)
 
 
 class SearchHandler(JsonHandler):
@@ -327,7 +337,7 @@ class SearchHandler(JsonHandler):
                 query.order(self.request.get(arg))
                 continue
             if arg == 'cursor':
-                query.cursor(self.request.get(arg))
+                query.with_cursor(self.request.get(arg))
                 continue
             if arg == 'limit':
                 try:
