@@ -1,6 +1,7 @@
 import unittest
 import urllib2
 import json
+import logging
 
 api_host = "localhost:5000"
 api_root = "http://{0}/simple/".format(api_host)
@@ -44,31 +45,27 @@ def encode_multidict_as_utf8(post):
     return result
 
 
-def urlencode_multidict(dict):
-    if not dict:
+def urlencode_multidict(data):
+    if not data:
         return None
     import urllib
-    utf8dict = encode_multidict_as_utf8(dict)
+    utf8dict = encode_multidict_as_utf8(data)
     return urllib.urlencode(utf8dict, doseq=True)
 
 
 class ApiCallFailedException(Exception):
-    """ API Call Failed. """
-    def __init__(self, value): # real signature unknown
-        self.value = value
+    pass
 
-    def __str__(self):
-        return repr(self.value)
+
+class ObjectMissingException(Exception):
+    pass
 
 
 def call_json_api(api_path, query_string=None, payload=None, method='GET'):
-    import urllib
     data = None
     if payload:
         data = json.dumps(payload)
     query_string = urlencode_multidict(query_string)
-    #utf8_data = unicode(data).encode('utf-8')
-    # urlencoded_data = urllib.urlencode(utf8_data)
     url = api_path
 
     if method == 'GET' and query_string:
@@ -77,11 +74,15 @@ def call_json_api(api_path, query_string=None, payload=None, method='GET'):
     headers = {'Content-Type': 'application/json'}
 
     request = urllib2.Request(url, data, headers)
+    request.get_method = lambda: method
     response = urllib2.urlopen(request)
     body = response.read()
 
     result = json.loads(body)
     if result.get('status') != 'success':
+        if result.get('type') == 'ObjectMissingException':
+            raise ObjectMissingException(result.get('message'))
+
         raise ApiCallFailedException('API Call Failed: ' + str(body))
 
     data = result.get('data')
@@ -89,12 +90,54 @@ def call_json_api(api_path, query_string=None, payload=None, method='GET'):
 
 
 class TestSimpleApi(unittest.TestCase):
-    def x_test_list_fruit(self):
-        data = call_json_api(api_root + "Fruit/search")
-        for fruit in data.get('models'):
-            pass
+    def assertDictContainsDict(self, smaller, bigger, exclude_keys=None):
+        exclude_keys = exclude_keys or []
+        for key in smaller:
+            if key in exclude_keys:
+                continue
 
-    def test_create_fruit(self):
+            self.assertEqual(bigger.get(key), smaller.get(key))
+
+    def list_fruit(self, cursor=None, limit=None):
+        querystring = {}
+        if limit:
+            querystring['limit'] = limit
+        if cursor:
+            querystring['cursor'] = cursor
+
+        logging.info('Listing fruit with cursor ' + str(cursor))
+
+        data = call_json_api(api_root + "Fruit/search", query_string=querystring)
+        return data['models'], data['cursor']
+
+    def delete_fruit(self, id_):
+        return call_json_api(api_root + "Fruit/{0}".format(id_), method="DELETE")
+
+    def create_fruit(self, data):
+        return call_json_api(api_root + "Fruit", payload=data, method="POST")
+
+    def get_fruit(self, id_):
+        return call_json_api(api_root + "Fruit/{0}".format(id_))
+
+    def modify_fruit(self, id_, data):
+        return call_json_api(api_root + "Fruit/{0}".format(id_), payload=data, method="PUT")
+
+    def test_delete_all_fruit(self):
+        limit = 2
+        (fruits, cursor) = self.list_fruit(limit=2)
+        for fruit in fruits:
+            self.delete_fruit(fruit['id'])
+
+        while cursor:
+            (fruits, cursor) = self.list_fruit(cursor=cursor, limit=limit)
+            for fruit in fruits:
+                self.delete_fruit(fruit['id'])
+
+        fruits, cursor = self.list_fruit()
+        self.assertFalse(fruits, "There should be no fruits after running test_delete_all_fruit")
+
+    def test_CRUD(self):
+        self.skipTest("Skipping CRUD for now.")
         data = {
             "name": "Banana",
             "width": 5,
@@ -103,13 +146,34 @@ class TestSimpleApi(unittest.TestCase):
                 {"lat": 0, "lon": 0},
                 {"lat": 1, "lon": 2},
                 {"lat": 3.4, "lon": 5.6},
-                {"lat": "7", "lon": "8.9"},
-            ],
+                {"lat": 7, "lon": 8.9},
+                ],
             "touched_dates": [
                 "2012-01-03T15:32:00",
                 "2012-01-04T17:01:16",
                 "2012-01-07T00:01:02",
-            ]
+                ]
         }
 
-        response = call_json_api(api_root + "Fruit", payload=data, method="POST")
+        #CREATE
+        new_id = self.create_fruit(data)
+
+        #READ
+        created = self.get_fruit(new_id)
+        self.assertDictContainsDict(data, created)
+
+        #UPDATE
+        created["width"] = 20
+        updated_id = self.modify_fruit(created['id'], created)
+        self.assertEquals(new_id, updated_id, "New and Updated IDs don't match")
+        updated_model = self.get_fruit(updated_id)
+        self.assertDictContainsDict(created, updated_model,
+                                    exclude_keys=['modified_datetime', 'modified_date', 'modified_time'])
+
+        #DELETE
+        self.delete_fruit(updated_id)
+        try:
+            result = self.get_fruit(new_id)
+            self.assertFalse(True, "Fruit with id {0} should have been deleted!".format(new_id))
+        except ObjectMissingException:
+            pass
