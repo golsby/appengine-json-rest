@@ -10,9 +10,8 @@ Setup Features:
 ---------------
   * See docs for for create_application() for details.
   * Create your REST URL at any location in your App Engine app.
-  * Register models individually (see register_model())
+  * Register models individually
   * Register all models in a module - recursively, if you want
-    (see register_models_from_module())
   * Custom authentication/authorization function to restrict access to your API.
   * Require HTTPS (added as a double layer of safety in case you use basic
     authentication - be sure to set up your app.yaml property, too).

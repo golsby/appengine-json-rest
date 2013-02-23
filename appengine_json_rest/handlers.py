@@ -4,10 +4,6 @@ import re
 
 from google.appengine.ext import webapp
 
-from registry import \
-    get_registered_model_names, \
-    get_registered_model_type,\
-    get_registered_model_instance
 from errors import \
     HttpsRequiredError, \
     ModelNotRegisteredError, \
@@ -43,28 +39,19 @@ def authenticate(function):
     def decorated(*args, **kwargs):
         self = args[0]
         localhost = self.request.host.startswith('localhost')
-        if __require_https and not localhost:
+        if self.app.require_https and not localhost:
             if os.environ.get("HTTPS") != 'on':
                 raise HttpsRequiredError()
 
-        if __authenticator:
+        if self.app.authenticator:
             try:
-                __authenticator(self.request)
+                self.app.authenticator(self.request)
             except AuthenticationRequiredError:
                 self.error(401)
                 return
 
         return function(*args, **kwargs)
     return decorated
-
-
-def set_authenticator(authenticator):
-    """
-    Set authenticator function used by all HTTP requests.
-    Function signature: authenticator(webob.request)
-    """
-    global __authenticator
-    __authenticator = authenticator
 
 
 def set_https_required(value):
@@ -162,11 +149,11 @@ class MetadataHandler(JsonHandler):
     @authenticate
     def get(self, modelName=None):
         if modelName:
-            (modelClass, converter) = get_registered_model_type(modelName)
+            (modelClass, converter) = self.app.get_registered_model_type(modelName)
             metadata = converter.metadata(modelClass)
             self.api_success(metadata)
         else:
-            self.api_success(get_registered_model_names())
+            self.api_success(self.app.get_registered_model_names())
 
 
 class SingleModelHandler(JsonHandler):
@@ -187,7 +174,7 @@ class SingleModelHandler(JsonHandler):
             }
         }
         """
-        (model, converter) = get_registered_model_instance(modelName, key)
+        (model, converter) = self.app.get_registered_model_instance(modelName, key)
         self.api_success(converter.read_model(model))
 
     @authenticate
@@ -210,7 +197,7 @@ class SingleModelHandler(JsonHandler):
         See the description if id() for details:
         https://developers.google.com/appengine/docs/python/datastore/keyclass#Key_id
         """
-        (model_class, converter) = get_registered_model_type(modelName)
+        (model_class, converter) = self.app.get_registered_model_type(modelName)
         import urllib
         json_string = urllib.unquote(self.request.body)
         values = json.loads(json_string)
@@ -235,7 +222,7 @@ class SingleModelHandler(JsonHandler):
 
         Where key is the passed-in parameter
         """
-        (model, converter) = get_registered_model_instance(modelName, key)
+        (model, converter) = self.app.get_registered_model_instance(modelName, key)
         import urllib
         json_string = urllib.unquote(self.request.body)
         values = json.loads(json_string)
@@ -261,7 +248,7 @@ class SingleModelHandler(JsonHandler):
 
         Where key is the passed-in parameter
         """
-        (model, converter) = get_registered_model_instance(modelName, key)
+        (model, converter) = self.app.get_registered_model_instance(modelName, key)
         model.delete()
         try:
             id_ = int(key)
@@ -320,7 +307,7 @@ class SearchHandler(JsonHandler):
     @authenticate
     def get(self, model_name):
         try:
-            (modelClass, converter) = get_registered_model_type(model_name)
+            (modelClass, converter) = self.app.get_registered_model_type(model_name)
         except TypeError:
             raise ModelNotRegisteredError(model_name)
 
