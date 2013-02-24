@@ -25,10 +25,6 @@ QUERY_EXPRS = {
     "fin_": "{0} IN"}
 
 
-__authenticator = None
-__require_https = True
-
-
 def authenticate(function):
     """
     Decorator for any webapp.RequestHandler class method.
@@ -52,11 +48,6 @@ def authenticate(function):
 
         return function(*args, **kwargs)
     return decorated
-
-
-def set_https_required(value):
-    global __require_https
-    __require_https = value
 
 
 class JsonHandler(webapp.RequestHandler):
@@ -124,12 +115,13 @@ class JsonHandler(webapp.RequestHandler):
             return
         else:
             message = str(exception)
-            data = {'args': exception.args}
             logging.error(exception.args)
             if debug:
                 trace = traceback.format_stack()
-                data['trace'] = trace
+                data = {'trace': trace}
                 logging.error("EXCEPTION: %s" % str(trace))
+            else:
+                data = None
 
         self.api_fail(message=message, data=data, exception_class_name=exception.__class__.__name__)
 
@@ -323,7 +315,7 @@ class SearchHandler(JsonHandler):
                 query_property = match.group(2)
                 operator = QUERY_EXPRS.get(query_type)
                 prop = modelClass._properties.get(query_property)
-                value = converter.__property_from_type(prop, arg)
+                value = converter._property_from_type(prop, self.request.get(arg))
                 query.filter(operator.format(query_property), value)
                 continue
             if arg == 'order':
@@ -340,6 +332,7 @@ class SearchHandler(JsonHandler):
                     raise ApiFailureError('limit parameter must be an integer')
 
         models = query.fetch(limit)
+
         data['cursor'] = None
         if len(models) == limit:
             data['cursor'] = query.cursor()
