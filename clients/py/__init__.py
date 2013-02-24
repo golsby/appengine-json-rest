@@ -1,3 +1,4 @@
+import urllib
 import urllib2
 import json
 import base64
@@ -15,6 +16,72 @@ class AuthenticationFailedError(Exception):
     pass
 
 
+class OperatorNotFoundError(Exception):
+    pass
+
+
+class Query(object):
+    FILTER_METHODS = {
+        '=': 'feq_',
+        '>': 'fgt_',
+        '>=': 'fge_',
+        '<': 'flt_',
+        '<=': 'fle_',
+        '!=': 'fne_',
+        'IN': 'fin_'
+    }
+    def __init__(self, client):
+        self.client = client
+        self.params = []
+
+    def filter(self, expression, value):
+        """
+        Adds a filter to the API call
+
+        Returns:
+            self to support method chaining
+        """
+        if not ' ' in expression:
+            raise OperatorNotFoundError("Operator not found in expression '{0}'. (Are you missing a space between the property name and the operator?)".format(expression))
+
+        (prop, operator) = expression.split(' ')
+        prefix = Query.FILTER_METHODS.get(operator)
+        if prefix:
+            self.params.append(('{0}{1}'.format(prefix, prop), value))
+        else:
+            raise OperatorNotFoundError('Unsupported operator: ' + operator)
+
+        return self
+
+    def order(self, prop, descending=False):
+        if descending:
+            self.params.append(('order', '-' + prop))
+        else:
+            self.params.append(('order', prop))
+        return self
+
+    def fetch(self, limit=None):
+        if limit:
+            try:
+                limit = int(limit)
+            except TypeError:
+                raise ValueError('limit must be an int')
+
+            self.params.append(('limit', limit))
+
+        querystring = ''
+        for (key, value) in self.params:
+            if querystring:
+                querystring += "&"
+            querystring += "{0}={1}".format(self.encode(key), self.encode(value))
+
+        return self.client.search(querystring)
+
+    def encode(self, s):
+        utf8 = unicode(s).encode('utf-8')
+        return urllib.quote(utf8)
+
+
 class JSONClient(object):
     def __init__(self, model_name, api_root, headers=None, username=None, password=None):
         self.username = username
@@ -25,40 +92,40 @@ class JSONClient(object):
 
     def create(self, data):
         url = self.api_root + self.model_name
-        return self.__call_json_api(url, payload=data, method='POST')
+        return self._call_json_api(url, payload_params=data, method='POST')
 
     def read(self, id_):
         url = '{0}{1}/{2}'.format(self.api_root, self.model_name, id_)
-        return self.__call_json_api(url, method='GET')
+        return self._call_json_api(url, method='GET')
 
     def update(self, id_, data):
         url = '{0}{1}/{2}'.format(self.api_root, self.model_name, id_)
-        return self.__call_json_api(url, payload=data, method='PUT')
+        return self._call_json_api(url, payload_params=data, method='PUT')
 
     def delete(self, id_):
         url = '{0}{1}/{2}'.format(self.api_root, self.model_name, id_)
-        return self.__call_json_api(url, method='DELETE')
+        return self._call_json_api(url, method='DELETE')
 
-    def search(self, limit=None, cursor=None):
+    def search(self, querystring):
         url = '{0}{1}/search'.format(self.api_root, self.model_name)
-        querystring = {}
-        if limit:
-            querystring['limit'] = limit
-        if cursor:
-            querystring['cursor'] = cursor
 
-        data = self.__call_json_api(url, query_string=querystring)
+        data = self._call_json_api(url, querystring=querystring)
         return data['models'], data['cursor']
 
-    def __call_json_api(self, api_path, query_string=None, payload=None, method='GET'):
+    def _call_json_api(self, api_path, query_params=None, payload_params=None, querystring=None, method='GET'):
         data = None
-        if payload:
-            data = json.dumps(payload)
-        query_string = JSONClient.urlencode_multidict(query_string)
+        if payload_params:
+            data = json.dumps(payload_params)
+
+        if querystring and query_params:
+            raise ValueError("Only one of query_string and query_params may be passed")
+
+        if query_params:
+            querystring = JSONClient.urlencode_multidict(query_params)
         url = api_path
 
-        if method == 'GET' and query_string:
-            url += "?" + query_string
+        if method == 'GET' and querystring:
+            url += "?" + querystring
 
         headers = {
             'Content-Type': 'application/json, charset=utf-8',

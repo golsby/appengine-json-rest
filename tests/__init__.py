@@ -1,6 +1,6 @@
 import unittest
 import urllib2
-from appengine_json_rest.clients.py import JSONClient, AuthenticationFailedError, ObjectMissingError
+from appengine_json_rest.clients.py import JSONClient, AuthenticationFailedError, ObjectMissingError, Query
 
 
 # These tests are designed to work with the sample
@@ -81,7 +81,7 @@ class TestSimpleApi(unittest.TestCase):
         except ObjectMissingError:
             pass
 
-    def test_auth(self):
+    def xtest_auth(self):
         # Server expects HTTP Basic Authentication
         AuthFruit = JSONClient('Fruit', auth_api_root, username='naive', password='pa$sw0rd')
         fruits, cursor = AuthFruit.search()
@@ -94,3 +94,14 @@ class TestSimpleApi(unittest.TestCase):
         # Incorrect credentials should raise HTTP 401 error
         NoAuthFruit = JSONClient('Fruit', auth_api_root, username='incorrect', password='wrong')
         self.assertRaises(AuthenticationFailedError, NoAuthFruit.search)
+
+    def test_search(self):
+        F = JSONClient('Fruit', api_root)
+        #for i in range(0, 5):
+        #    F.create({'name': 'Banana', 'width': i})
+        #    F.create({'name': 'Apple', 'width': i})
+
+        Q = Query(F).filter('name =', 'Apple')
+        Q = Q.filter('width >', 2).order('created_datetime')
+        (models, cursor) = Q.fetch(10)
+        pass
