@@ -140,11 +140,11 @@ class DictionaryConverter(object):
         fn = get_property_converter_function(direction, type(prop))
         return fn(value)
 
-    def __type_from_property(self, model, prop):
+    def _type_from_property(self, model, prop):
         value = getattr(model, prop.name)
         return self.__convert_property(FROM_PROPERTY, prop, value)
 
-    def __property_from_type(self, prop, value):
+    def _property_from_type(self, prop, value):
         return self.__convert_property(TO_PROPERTY, prop, value)
 
     # HTTP GET
@@ -154,7 +154,7 @@ class DictionaryConverter(object):
             'id': model.key().id()
         }
         for name, prop in model._properties.iteritems():
-            result[name] = self.__type_from_property(model, prop)
+            result[name] = self._type_from_property(model, prop)
         return result
 
     # HTTP PUT (update), Idempotent
@@ -163,7 +163,7 @@ class DictionaryConverter(object):
         for (k, v) in values.iteritems():
             prop = model._properties.get(k)
             if prop:
-                converted_values[k] = self.__property_from_type(prop, v)
+                converted_values[k] = self._property_from_type(prop, v)
 
         for k, v in converted_values.iteritems():
             setattr(model, k, v)
@@ -176,7 +176,7 @@ class DictionaryConverter(object):
         for (k, v) in values.iteritems():
             prop = model_type._properties.get(k)
             if prop:
-                converted_values[k] = self.__property_from_type(prop, v)
+                converted_values[k] = self._property_from_type(prop, v)
 
         model = model_type(**converted_values)
         model.put()
