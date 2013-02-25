@@ -30,6 +30,7 @@ class Query(object):
         '!=': 'fne_',
         'IN': 'fin_'
     }
+
     def __init__(self, client):
         self.client = client
         self.params = []
@@ -58,6 +59,10 @@ class Query(object):
             self.params.append(('order', '-' + prop))
         else:
             self.params.append(('order', prop))
+        return self
+
+    def with_cursor(self, cursor):
+        self.params.append(('cursor', cursor))
         return self
 
     def fetch(self, limit=None):

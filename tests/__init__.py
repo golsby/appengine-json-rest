@@ -101,7 +101,9 @@ class TestSimpleApi(unittest.TestCase):
         #    F.create({'name': 'Banana', 'width': i})
         #    F.create({'name': 'Apple', 'width': i})
 
-        Q = Query(F).filter('name =', 'Apple')
-        Q = Q.filter('width >', 2).order('created_datetime')
-        (models, cursor) = Q.fetch(10)
+        Q = Query(F).filter('name =', 'Apple').order('created_datetime')
+        (models, cursor) = Q.fetch(2)
+        while cursor:
+            Q = Query(F).filter('name =', 'Apple').order('created_datetime').with_cursor(cursor)
+            models, cursor = Q.fetch(2)
         pass
