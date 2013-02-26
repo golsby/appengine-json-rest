@@ -27,8 +27,7 @@ class Query(object):
         '>=': 'fge_',
         '<': 'flt_',
         '<=': 'fle_',
-        '!=': 'fne_',
-        'IN': 'fin_'
+        '!=': 'fne_'
     }
 
     def __init__(self, client):

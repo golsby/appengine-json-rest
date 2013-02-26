@@ -34,3 +34,9 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+/clients/cs/fastJSON
+/clients/cs/JsonNET
+/clients/cs/*.suo
+/clients/cs/obj
+/tests/cs/*.suo
+/tests/cs/obj

@@ -21,8 +21,7 @@ QUERY_EXPRS = {
     "fgt_": "{0} >",
     "fle_": "{0} <=",
     "fge_": "{0} >=",
-    "fne_": "{0} !=",
-    "fin_": "{0} IN"}
+    "fne_": "{0} !="}
 
 
 def authenticate(function):

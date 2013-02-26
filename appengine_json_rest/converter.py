@@ -39,6 +39,8 @@ def from_geopt(p):
 
 
 def to_geopt(o):
+    if not o:
+        return None;
     if type(o) is dict:
         return db.GeoPt(o.get('lat', 0), o.get('lon', 0))
     if type(o) is list:
