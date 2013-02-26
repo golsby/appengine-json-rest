@@ -3,9 +3,11 @@ from google.appengine.ext import db
 from google.appengine.api import datastore_types
 from dateutil import parser as date_parser
 import datetime
+from importlib import import_module
 
 FROM_PROPERTY = 0
 TO_PROPERTY = 1
+
 
 def from_date(date):
     return date.isoformat()
@@ -49,6 +51,26 @@ def to_geopt(o):
     raise TypeError('Conversion to db.GeoPt expected dict or list; got {0}'.format(type(o)))
 
 
+def from_refprop(o):
+    return {
+        "model": type(o).__name__,
+        "module": type(o).__module__,
+        "id": o.key().id(),
+        "key": str(o.key())
+    }
+
+
+def to_refprop(o):
+    if type(o) is basestring:
+        return db.Model.get(o)
+
+    if type(o) is dict:
+        module = import_module(o.get('module'))
+        cls = getattr(module, o.get('model'))
+        obj = cls.get_by_id(o.get('id'))
+        return obj
+
+
 def from_byte_array(b):
     pass
 
@@ -69,11 +91,11 @@ property_converters = {
     db.FloatProperty: (float, float),
     db.GeoPtProperty: (from_geopt, to_geopt),
     datastore_types.GeoPt: (from_geopt, to_geopt),
+    db.ReferenceProperty: (from_refprop, to_refprop),
 
     # Unsupported Types
     # TODO: Support these unsupported types.
     # TODO: Updated documentation as support comes!
-    # db.ReferenceProperty (string?)
     # db.ListProperty
     # db.StringListProperty
     # db.Key

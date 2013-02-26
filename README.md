@@ -69,7 +69,7 @@ Currently Supported Types:
 --------------------------
 **Explicitly Supported Types:**
 
-(Type coersion is performed to convert input of the wrong type into the correct type)
+(Type coersion is performed on reasonable input values)
   * db.DateTimeProperty: ISO 8601 format
   * datetime.datetime: ISO 8601 format
   * db.DateProperty: ISO 8601 format
@@ -77,6 +77,15 @@ Currently Supported Types:
   * db.FloatProperty: float
   * db.GeoPtProperty: {"lat":float,"lon":float}
   * datastore_types.GeoPt: {"lat":float,"lon":float}
+  * db.ListProperty
+  * db.StringListProperty
+  * db.ReferenceProperty:
+    Returned as:
+        {"module":"package.name", "model": "ModelClassName", "id": 7, "key", "appengine-model-key-string"}
+    Converts:
+        "appengine-model-key-string"
+        or
+        {"module":"package.name", "model": "ModelClassName", "id": int}
 
 **Implicitly Supported Types:**
 
@@ -97,9 +106,6 @@ Currently Supported Types:
   * db.RatingProperty: int
 
 **NOT Supported Types:**
-  * db.ReferenceProperty
-  * db.ListProperty
-  * db.StringListProperty
   * db.Key
   * blobstore.BlobKey
   * blobstore.BlobReferenceProperty
