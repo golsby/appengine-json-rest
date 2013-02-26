@@ -59,6 +59,8 @@ class JSONApplication(WSGIApplication):
                 model_name += model.__module__ + '.'
             model_name += model.__name__
 
+            logging.info("Registering model '{0}' as '{1}'".format(model.__module__ + '.' + model.__name__, model_name))
+
             if self.__registered_models.get(model_name):
                 raise KeyError('Model with name {0} already registered'.format(model_name))
             self.__registered_models[model_name] = (model, converter or DictionaryConverter())
