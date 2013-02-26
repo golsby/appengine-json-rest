@@ -5,7 +5,8 @@ from converter import DictionaryConverter
 import handlers
 import errors
 import logging
-import sys
+import importlib
+from types import ModuleType
 
 
 class JSONApplication(WSGIApplication):
@@ -19,7 +20,7 @@ class JSONApplication(WSGIApplication):
             ('/%s/([^/]+)/search' % prefix, handlers.SearchHandler),
             ('/%s/([^/]+)/?' % prefix, handlers.SingleModelHandler),
             ('/%s/([^/]+)/([^/]+)/?' % prefix, handlers.SingleModelHandler),
-        ]
+            ]
 
         super(JSONApplication, self).__init__(routes, debug, config)
         self.require_https = require_https
@@ -34,6 +35,13 @@ class JSONApplication(WSGIApplication):
         if model_modules:
             for module in model_modules:
                 self.register_models_from_module(module, recurse=True)
+
+    @staticmethod
+    def _full_path(obj):
+        if not hasattr(obj, "__module__"):
+            return obj.__name__
+
+        return obj.__module__ + '.' + obj.__name__
 
     def register_model(self, model, converter=None, prefix_with_package_path=False):
         """
@@ -54,14 +62,17 @@ class JSONApplication(WSGIApplication):
                 collisions of models in different packages.
         """
         if isinstance(model, type) and issubclass(model, db.Model):
-            model_name = ''
+            model_name = model.__name__
             if prefix_with_package_path:
-                model_name += model.__module__ + '.'
-            model_name += model.__name__
+                model_name = self._full_path(model)
 
-            logging.info("Registering model '{0}' as '{1}'".format(model.__module__ + '.' + model.__name__, model_name))
+            logging.info("Registering model '{0}' as '{1}'".format(self._full_path(model), model_name))
 
-            if self.__registered_models.get(model_name):
+            already_registered_model = self.__registered_models.get(model_name)
+            if already_registered_model:
+                if self._full_path(already_registered_model[0]) == self._full_path(model):
+                    logging.debug("Model already registered: " + self._full_path(model))
+                    return  # Don't error if we're importing the same model with the same name.
                 raise KeyError('Model with name {0} already registered'.format(model_name))
             self.__registered_models[model_name] = (model, converter or DictionaryConverter())
 
@@ -88,17 +99,17 @@ class JSONApplication(WSGIApplication):
                 Models, False otherwise
 
         """
-        logging.info("adding models from module %s", model_module)
+        logging.debug("adding models from module %s", model_module)
         if not exclude_model_types:
             exclude_model_types = []
         if isinstance(model_module, basestring):
-            model_module = __import__(model_module)
+            model_module = importlib.import_module(model_module)
         for obj_name in dir(model_module):
             obj = getattr(model_module, obj_name)
-            if isinstance(obj, type(sys)):
-                # only import "nested" modules, otherwise we get the whole
-                # world and bad things happen
-                if recurse and obj.__name__.startswith(model_module.__name__ + "."):
+            if isinstance(obj, ModuleType):
+                # If we get here, obj is a Module, so we'll try to register models within it.
+                if recurse and self._full_path(obj).startswith(self._full_path(model_module)):
+                    logging.debug("Recursively registering {0} because it starts with {1}".format(self._full_path(obj), self._full_path(model_module)))
                     self.register_models_from_module(obj, prefix_with_package_path, exclude_model_types, recurse)
 
             self.register_model(obj, prefix_with_package_path=prefix_with_package_path)
