@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
-//using fastJSON;
-using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
-
 
 namespace cs
 {
@@ -53,7 +50,7 @@ namespace cs
                                                                 {">=", "fge_"},
                                                                 {"<", "flt_"},
                                                                 {"<=", "fle_"},
-                                                                {"!=", "fne_}"}
+                                                                {"!=", "fne_"}
                                                              };
 
     readonly List<KeyValuePair<string, object>> m_params = new List<KeyValuePair<string,object>>();
