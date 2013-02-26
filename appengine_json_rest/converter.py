@@ -35,14 +35,14 @@ def to_time(s):
 
 def from_geopt(p):
     if p:
-        return {'lat':p.lat,'lon':p.lon}
+        return {'lat': p.lat, 'lon': p.lon}
     else:
         return None
 
 
 def to_geopt(o):
     if not o:
-        return None;
+        return None
     if type(o) is dict:
         return db.GeoPt(o.get('lat', 0), o.get('lon', 0))
     if type(o) is list:
