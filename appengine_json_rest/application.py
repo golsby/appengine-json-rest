@@ -11,7 +11,9 @@ from types import ModuleType
 
 class JSONApplication(WSGIApplication):
     """
-
+    Parameters:
+        auth_func: function that takes a WebOb.request
+        Should raise errors.AuthenticationRequiredException or errors.AuthenticationFailedException appropriately.
     """
     def __init__(self, prefix, auth_func=None, require_https=False, models=None, model_modules=None, debug=False, config=None):
         routes = [
@@ -25,8 +27,10 @@ class JSONApplication(WSGIApplication):
         super(JSONApplication, self).__init__(routes, debug, config)
         self.require_https = require_https
         self.authenticator = auth_func
-        self.__registered_models = {}
+        self.__models_by_name = {}
+        self.__models_by_type = {}
         self.__property_converters = {}
+        self.root_url = "/{0}".format(prefix)
 
         if models:
             for model in models:
@@ -68,13 +72,14 @@ class JSONApplication(WSGIApplication):
 
             logging.info("Registering model '{0}' as '{1}'".format(self._full_path(model), model_name))
 
-            already_registered_model = self.__registered_models.get(model_name)
+            already_registered_model = self.__models_by_name.get(model_name)
             if already_registered_model:
                 if self._full_path(already_registered_model[0]) == self._full_path(model):
                     logging.debug("Model already registered: " + self._full_path(model))
                     return  # Don't error if we're importing the same model with the same name.
                 raise KeyError('Model with name {0} already registered'.format(model_name))
-            self.__registered_models[model_name] = (model, converter or DictionaryConverter())
+            self.__models_by_name[model_name] = (model, converter or DictionaryConverter())
+            self.__models_by_type[model] = (model_name, converter or DictionaryConverter())
 
     def register_models_from_module(self, model_module, prefix_with_package_path=False, exclude_model_types=None, recurse=False):
         """
@@ -116,16 +121,23 @@ class JSONApplication(WSGIApplication):
 
     def get_registered_model_names(self):
         names = []
-        for registered_model in self.__registered_models:
-            names.append(registered_model)
+        for model_names in self.__models_by_name:
+            names.append(model_names)
         return names
 
     def get_registered_model_type(self, model_name):
-        (model_class, converter) = self.__registered_models.get(model_name)
+        (model_class, converter) = self.__models_by_name.get(model_name, (None, None))
         if not model_class:
             raise errors.ModelNotRegisteredError(model_name)
 
         return model_class, converter
+
+    def get_registered_name(self, model_obj):
+        (model_name, converter) = self.__models_by_type.get(model_obj, (None, None))
+        if not model_name:
+            raise errors.ModelNotRegisteredError(model_obj.__name__)
+
+        return model_name
 
     def get_registered_model_instance(self, model_name, key):
         (model_class, converter) = self.get_registered_model_type(model_name)
