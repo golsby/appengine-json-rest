@@ -1,6 +1,5 @@
 import unittest
-import urllib2
-from appengine_json_rest.clients.py import JSONClient, AuthenticationFailedError, ObjectMissingError, Query
+from appengine_json_rest.clients.py import JSONClient, ForbiddenError, ObjectMissingError, Query, AuthenticationRequiredError
 
 
 # These tests are designed to work with the sample
@@ -37,8 +36,11 @@ class TestSimpleApi(unittest.TestCase):
         fruits, cursor = Fruit.search()
         self.assertFalse(fruits, "There should be no fruits after running test_delete_all_fruit")
 
-    def xtest_CRUD(self):
-        self.skipTest("speed up")
+    def test_CRUD(self):
+        basket = {
+            "location": {"lat": 10, "lon": 5}
+        }
+
         data = {
             "name": "Banana",
             "width": 5,
@@ -57,43 +59,32 @@ class TestSimpleApi(unittest.TestCase):
         }
 
         Fruit = JSONClient("Fruit", api_root)
+        Basket = JSONClient("Basket", api_root)
 
         #CREATE
-        new_id = Fruit.create(data)
+        basket_obj = Basket.create(basket)
+        data['basket'] = basket_obj
+        created = Fruit.create(data)
 
-        #READ
-        created = Fruit.read(new_id)
-        self.assertDictContainsDict(data, created)
+        self.assertDictContainsDict(data, created, exclude_keys=['basket'])
+        self.assertDictContainsDict(data['basket'], created['basket'], exclude_keys=['location'])
 
         #UPDATE
         created["width"] = 20
-        updated_id = Fruit.update(created['id'], created)
-        self.assertEquals(new_id, updated_id, "New and Updated IDs don't match")
-        updated_model = Fruit.read(updated_id)
+        updated_model = Fruit.update(created['id'], created)
         self.assertDictContainsDict(created, updated_model,
                                     exclude_keys=['modified_datetime', 'modified_date', 'modified_time'])
 
         #DELETE
-        Fruit.delete(updated_id)
+        id_ = updated_model.get('id')
+        Fruit.delete(id_)
+        Basket.delete(basket_obj.get('id'))
         try:
-            result = Fruit.read(new_id)
-            self.assertFalse(True, "Fruit with id {0} should have been deleted!".format(new_id))
+            result = Fruit.read(id_)
+            self.assertFalse(True, "Fruit with id {0} should have been deleted!".format(id_))
         except ObjectMissingError:
             pass
 
-    def xtest_auth(self):
-        # Server expects HTTP Basic Authentication
-        AuthFruit = JSONClient('Fruit', auth_api_root, username='naive', password='pa$sw0rd')
-        fruits, cursor = AuthFruit.search()
-
-        # Server expects basic authentication; should raise HTTP 401 error
-        # if no authentication information is passed.
-        NoAuthFruit = JSONClient('Fruit', auth_api_root)
-        self.assertRaises(urllib2.HTTPError, NoAuthFruit.search)
-
-        # Incorrect credentials should raise HTTP 401 error
-        NoAuthFruit = JSONClient('Fruit', auth_api_root, username='incorrect', password='wrong')
-        self.assertRaises(AuthenticationFailedError, NoAuthFruit.search)
 
     def test_search(self):
         F = JSONClient('Fruit', api_root)
@@ -107,3 +98,21 @@ class TestSimpleApi(unittest.TestCase):
             Q = Query(F).filter('name =', 'Apple').order('created_datetime').with_cursor(cursor)
             models, cursor = Q.fetch(2)
         pass
+
+
+class TestAuthApi(unittest.TestCase):
+    def test_auth(self):
+        # Server expects HTTP Basic Authentication
+        AuthFruit = JSONClient('Fruit', auth_api_root, username='naive', password='pa$sw0rd')
+        fruits, cursor = AuthFruit.all().fetch()
+
+        # Server expects basic authentication; should raise HTTP 401 error
+        # if no authentication information is passed.
+        NoAuthFruit = JSONClient('Fruit', auth_api_root)
+        self.assertRaises(AuthenticationRequiredError, NoAuthFruit.all().fetch)
+
+        # Incorrect credentials should raise HTTP 401 error
+        NoAuthFruit = JSONClient('Fruit', auth_api_root, username='incorrect', password='wrong')
+        self.assertRaises(ForbiddenError, NoAuthFruit.all().fetch)
+
+
