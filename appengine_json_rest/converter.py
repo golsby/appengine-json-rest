@@ -1,3 +1,4 @@
+# TODO: Converters need to be on the application class so they have access to
 __author__ = 'Brian'
 from google.appengine.ext import db
 from google.appengine.api import datastore_types
@@ -52,12 +53,15 @@ def to_geopt(o):
 
 
 def from_refprop(o):
-    return {
-        "model": type(o).__name__,
-        "module": type(o).__module__,
-        "id": o.key().id(),
-        "key": str(o.key())
-    }
+    if o:
+        return {
+            "model": type(o).__name__,
+            "module": type(o).__module__,
+            "id": o.key().id(),
+            "key": str(o.key())
+        }
+
+    return None
 
 
 def to_refprop(o):
@@ -65,10 +69,16 @@ def to_refprop(o):
         return db.Model.get(o)
 
     if type(o) is dict:
-        module = import_module(o.get('module'))
-        cls = getattr(module, o.get('model'))
-        obj = cls.get_by_id(o.get('id'))
-        return obj
+        if o.get('key'):
+            return db.Model.get(o.get('key'))
+
+        if o.get('module') and o.get('model') and o.get('id'):
+            module = import_module(o.get('module'))
+            cls = getattr(module, o.get('model'))
+            obj = cls.get_by_id(o.get('id'))
+            return obj
+
+    return None
 
 
 def from_byte_array(b):
@@ -192,7 +202,7 @@ class DictionaryConverter(object):
         for k, v in converted_values.iteritems():
             setattr(model, k, v)
         model.put()
-        return model.key().id()
+        return model
 
     # HTTP POST (create), will create multiple items if called multiple times
     def create_model(self, model_type, values):
@@ -204,7 +214,7 @@ class DictionaryConverter(object):
 
         model = model_type(**converted_values)
         model.put()
-        return model.key().id()
+        return model
 
     def metadata(self, cls):
         result = {}
