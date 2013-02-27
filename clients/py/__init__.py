@@ -12,7 +12,11 @@ class ObjectMissingError(Exception):
     pass
 
 
-class AuthenticationFailedError(Exception):
+class ForbiddenError(Exception):
+    pass
+
+
+class AuthenticationRequiredError(Exception):
     pass
 
 
@@ -110,6 +114,9 @@ class JSONClient(object):
         url = '{0}{1}/{2}'.format(self.api_root, self.model_name, id_)
         return self._call_json_api(url, method='DELETE')
 
+    def all(self):
+        return Query(self)
+
     def search(self, querystring):
         url = '{0}{1}/search'.format(self.api_root, self.model_name)
 
@@ -140,7 +147,17 @@ class JSONClient(object):
 
         request = urllib2.Request(url, data, headers)
         request.get_method = lambda: method
-        response = urllib2.urlopen(request)
+        try:
+            response = urllib2.urlopen(request)
+        except urllib2.HTTPError as ex:
+            if ex.code == 403:
+                raise ForbiddenError()
+            if ex.code == 401:
+                raise AuthenticationRequiredError()
+            if ex.code == 404:
+                raise ObjectMissingError()
+            raise
+
         body = response.read()
 
         result = json.loads(body)
@@ -148,7 +165,7 @@ class JSONClient(object):
             if result.get('type') == 'ObjectMissingError':
                 raise ObjectMissingError(result.get('message'))
             if result.get('type') == 'AuthenticationFailedError':
-                raise AuthenticationFailedError()
+                raise ForbiddenError()
 
             raise ApiCallFailedError('API Call Failed: ' + str(body))
 

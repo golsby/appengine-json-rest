@@ -1,14 +1,11 @@
 import json
 import os
 import re
+import logging
 
 from google.appengine.ext import webapp
 
-from errors import \
-    HttpsRequiredError, \
-    ModelNotRegisteredError, \
-    ApiFailureError, \
-    AuthenticationRequiredError
+import errors
 
 
 __author__ = 'Brian'
@@ -36,14 +33,22 @@ def authenticate(function):
         localhost = self.request.host.startswith('localhost')
         if self.app.require_https and not localhost:
             if os.environ.get("HTTPS") != 'on':
-                raise HttpsRequiredError()
+                raise errors.HttpsRequiredError()
 
         if self.app.authenticator:
             try:
                 self.app.authenticator(self.request)
-            except AuthenticationRequiredError:
+            except errors.AuthenticationRequiredError as exception:
+                if not exception.headers or not exception.headers.get('WWW-Authenticate'):
+                    # A WWW-Authenticate header is required; without it the negotiation for authentication fails.
+                    logging.error('AuthenticationRequiredException must pass a WWW-Authenticate header.')
+                    self.error(500)
+                    return
+                self.response.headers.update(exception.headers)
                 self.error(401)
                 return
+            except errors.ForbiddenError:
+                self.error(403)
 
         return function(*args, **kwargs)
     return decorated
@@ -93,7 +98,7 @@ class JsonHandler(webapp.RequestHandler):
             response['data'] = data
         self.__render_json(response)
 
-    def api_fail(self, message=None, data=None, exception_class_name=None):
+    def api_fail(self, message=None, data=None, exception_class_name=None, status_code=404):
         response = {'status': 'error'}
         if message:
             response['message'] = message
@@ -101,7 +106,15 @@ class JsonHandler(webapp.RequestHandler):
             response['type'] = exception_class_name
         if data:
             response['data'] = data
+        self.response.set_status(status_code)
         self.__render_json(response)
+
+    def set_location_header(self, model):
+        model_type = type(model)
+        protocol = "http"
+        if os.environ.get("HTTPS") == "on":
+            protocol = "https"
+        self.response.headers["Location"] = "{0}/{1}".format(self.request.path, model.key().id())
 
     def handle_exception(self, exception, debug):
         import traceback
@@ -109,8 +122,11 @@ class JsonHandler(webapp.RequestHandler):
 
         self.indent = 4
 
-        if issubclass(exception.__class__, ApiFailureError):
-            self.api_fail(message=exception.value, exception_class_name=exception.__class__.__name__)
+        if type(exception) is errors.ObjectMissingError:
+            self.api_fail(message=exception.value, exception_class_name=exception.__class__.__name__, status_code=404)
+            return
+        if issubclass(exception.__class__, errors.ApiFailureError):
+            self.api_fail(message=exception.value, exception_class_name=exception.__class__.__name__, status_code=500)
             return
         else:
             message = str(exception)
@@ -193,7 +209,10 @@ class SingleModelHandler(JsonHandler):
         json_string = urllib.unquote(self.request.body)
         values = json.loads(json_string)
 
-        self.api_success(converter.create_model(model_class, values))
+        model = converter.create_model(model_class, values)
+        self.response.set_status(201)
+        self.set_location_header(model)
+        self.api_success(converter.read_model(model))
 
     @authenticate
     def put(self, modelName, key):
@@ -218,13 +237,9 @@ class SingleModelHandler(JsonHandler):
         json_string = urllib.unquote(self.request.body)
         values = json.loads(json_string)
 
-        converter.update_model(model, values)
-        try:
-            id_ = int(key)
-        except TypeError:
-            id_ = key
-
-        self.api_success(id_)
+        model = converter.update_model(model, values)
+        self.set_location_header(model)
+        self.api_success(converter.read_model(model))
 
     @authenticate
     def delete(self, modelName, key):
@@ -300,7 +315,7 @@ class SearchHandler(JsonHandler):
         try:
             (modelClass, converter) = self.app.get_registered_model_type(model_name)
         except TypeError:
-            raise ModelNotRegisteredError(model_name)
+            raise errors.ModelNotRegisteredError(model_name)
 
         data = {
             'models': []
@@ -328,7 +343,7 @@ class SearchHandler(JsonHandler):
                     limit = int(self.request.get(arg))
                     continue
                 except ValueError:
-                    raise ApiFailureError('limit parameter must be an integer')
+                    raise errors.ApiFailureError('limit parameter must be an integer')
 
         models = query.fetch(limit)
 

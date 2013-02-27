@@ -1,16 +1,16 @@
 __author__ = 'Brian'
 
 
-class ObjectMissingError(Exception):
-    pass
-
-
 class ApiFailureError(Exception):
     def __init__(self, value):
         self.value = value
 
     def __str__(self):
         return repr(self.value)
+
+
+class ObjectMissingError(ApiFailureError):
+    pass
 
 
 class HttpsRequiredError(ApiFailureError):
@@ -21,7 +21,7 @@ class HttpsRequiredError(ApiFailureError):
         return repr(self.value)
 
 
-class AuthenticationFailedError(ApiFailureError):
+class ForbiddenError(ApiFailureError):
     def __init__(self):
         self.value = "authentication failed"
 
@@ -30,7 +30,12 @@ class AuthenticationFailedError(ApiFailureError):
 
 
 class AuthenticationRequiredError(ApiFailureError):
-    pass
+    def __init__(self, headers=None):
+        self.headers = headers
+
+    def __str__(self):
+        return repr(self.headers)
+
 
 
 class ModelNotRegisteredError(ApiFailureError):
