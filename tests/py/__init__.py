@@ -24,16 +24,16 @@ class TestSimpleApi(unittest.TestCase):
         self.skipTest("speed up")
         limit = 2
         Fruit = JSONClient("Fruit", api_root)
-        (fruits, cursor) = Fruit.search(limit=limit)
+        (fruits, cursor) = Fruit.all().fetch(limit)
         for fruit in fruits:
             Fruit.delete(fruit['id'])
 
         while cursor:
-            (fruits, cursor) = Fruit.search(limit=limit, cursor=cursor)
+            (fruits, cursor) = Fruit.all().with_cursor(cursor).fetch(limit)
             for fruit in fruits:
                 Fruit.delete(fruit['id'])
 
-        fruits, cursor = Fruit.search()
+        fruits, cursor = Fruit.all().fetch()
         self.assertFalse(fruits, "There should be no fruits after running test_delete_all_fruit")
 
     def test_CRUD(self):
@@ -88,16 +88,19 @@ class TestSimpleApi(unittest.TestCase):
 
     def test_search(self):
         F = JSONClient('Fruit', api_root)
-        #for i in range(0, 5):
-        #    F.create({'name': 'Banana', 'width': i})
-        #    F.create({'name': 'Apple', 'width': i})
+        created_models = []
+        for i in range(0, 10):
+            created_models.append(F.create({'name': 'Banana', 'width': i}))
+            created_models.append(F.create({'name': 'Apple', 'width': i}))
 
-        Q = Query(F).filter('name =', 'Apple').order('created_datetime')
+        Q = F.all().filter('name =', 'Apple').order('created_datetime', descending=True)
         (models, cursor) = Q.fetch(2)
         while cursor:
-            Q = Query(F).filter('name =', 'Apple').order('created_datetime').with_cursor(cursor)
+            Q = F.all().filter('name =', 'Apple').order('created_datetime', descending=True).with_cursor(cursor)
             models, cursor = Q.fetch(2)
-        pass
+
+        for model in created_models:
+            F.delete(model.get('id'))
 
 
 class TestAuthApi(unittest.TestCase):
