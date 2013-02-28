@@ -21,24 +21,24 @@ class TestSimpleApi(unittest.TestCase):
 
             self.assertEqual(bigger.get(key), smaller.get(key))
 
-    def xtest_delete_all_fruit(self):
+    def test_delete_all_fruit(self):
         #self.skipTest("Performance")
-        limit = 2
+        limit = 10
         Fruit = JSONClient("Fruit", api_root)
-        (fruits, cursor, next_page) = Fruit.all().fetch(limit)
+        fruits, next_page = Fruit.all().fetch(limit)
         for fruit in fruits:
             Fruit.delete(fruit['id'])
 
-        while cursor:
-            (fruits, cursor, next_page) = Fruit.all().with_cursor(cursor).fetch(limit)
+        while next_page:
+            fruits, next_page = next_page.fetch(limit)
             for fruit in fruits:
                 Fruit.delete(fruit['id'])
 
-        fruits, cursor, next_page = Fruit.all().fetch()
+        fruits, next_page = Fruit.all().fetch()
         self.assertFalse(fruits, "There should be no fruits after running test_delete_all_fruit")
 
     def test_CRUD(self):
-        # self.skipTest("Performance")
+        self.skipTest("Performance")
         basket = {
             "location": {"lat": 10, "lon": 5}
         }
@@ -101,32 +101,31 @@ class TestSimpleApi(unittest.TestCase):
 
         # Make sure we get create_count models back
         Q = F.all().filter('name =', name1).order('created_datetime', descending=True)
-        (models, cursor, next_url) = Q.fetch(limit)
+        (models, next_query) = Q.fetch(limit)
         self.assertEquals(len(models), create_count)
 
         # Make sure we get a cursor when fetching less than all of them
         Q = F.all().filter('name =', name1).order('created_datetime', descending=True)
-        (models, cursor, next_url) = Q.fetch(create_count - 2)
-        self.assertNotEqual(cursor, None)
+        (models, next_query) = Q.fetch(create_count / 3)
+        self.assertNotEqual(next_query, None)
 
-        while cursor:
-            Q = F.all().filter('name =', 'Apple').order('created_datetime', descending=True).with_cursor(cursor)
-            models, cursor, next_url = Q.fetch(limit)
+        while next_query:
+            models, next_query = next_query.fetch()
 
         # Clean up
         for model in created_models:
             F.delete(model.get('id'))
 
         # Make sure none are left:
-        (models, cursor, next_url) = F.all().filter('name =', name1).fetch()
+        models, next_query = F.all().filter('name =', name1).fetch()
         self.assertEqual(len(models), 0)
-        (models, cursor, next_url) = F.all().filter('name =', name2).fetch()
+        models, next_query = F.all().filter('name =', name2).fetch()
         self.assertEqual(len(models), 0)
 
 
 class TestAuthApi(unittest.TestCase):
     def test_auth(self):
-        #self.skipTest("Performance")
+        self.skipTest("Performance")
         # Server expects HTTP Basic Authentication
         AuthFruit = JSONClient('Fruit', auth_api_root, username='naive', password='pa$sw0rd')
         fruits, cursor, next_url = AuthFruit.all().fetch()

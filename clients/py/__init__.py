@@ -2,6 +2,11 @@ import urllib
 import urllib2
 import json
 import base64
+import re
+
+
+class QueryLockedError(Exception):
+    pass
 
 
 class ApiCallFailedError(Exception):
@@ -34,9 +39,10 @@ class Query(object):
         '!=': 'fne_'
     }
 
-    def __init__(self, client):
+    def __init__(self, client, querystring=None):
         self.client = client
         self.params = []
+        self.querystring = querystring
 
     def filter(self, expression, value):
         """
@@ -45,6 +51,9 @@ class Query(object):
         Returns:
             self to support method chaining
         """
+        if self.querystring:
+            raise QueryLockedError("This query is locked and cannot be modified.")
+
         if not ' ' in expression:
             raise OperatorNotFoundError("Operator not found in expression '{0}'. (Are you missing a space between the property name and the operator?)".format(expression))
 
@@ -58,6 +67,9 @@ class Query(object):
         return self
 
     def order(self, prop, descending=False):
+        if self.querystring:
+            raise QueryLockedError("This query is locked and cannot be modified.")
+
         if descending:
             self.params.append(('order', '-' + prop))
         else:
@@ -65,6 +77,9 @@ class Query(object):
         return self
 
     def with_cursor(self, cursor):
+        if self.querystring:
+            raise QueryLockedError("This query is locked and cannot be modified.")
+
         self.params.append(('cursor', cursor))
         return self
 
@@ -77,13 +92,23 @@ class Query(object):
 
             self.params.append(('limit', limit))
 
-        querystring = ''
-        for (key, value) in self.params:
-            if querystring:
-                querystring += "&"
-            querystring += "{0}={1}".format(self.encode(key), self.encode(value))
+        if self.querystring:
+            querystring = self.querystring
+        else:
+            querystring = ''
+            for (key, value) in self.params:
+                if querystring:
+                    querystring += "&"
+                querystring += "{0}={1}".format(self.encode(key), self.encode(value))
 
-        return self.client.search(querystring)
+        (models, cursor, next_page) = self.client.search(querystring)
+        next_query = None
+        if cursor:
+            querystring = re.sub('cursor=[^?&]+&?', '', querystring)
+            querystring = querystring.rstrip('&')
+            querystring += '&cursor=' + cursor
+            next_query = Query(self.client, querystring)
+        return models, next_query
 
     def encode(self, s):
         utf8 = unicode(s).encode('utf-8')
