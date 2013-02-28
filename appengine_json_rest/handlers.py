@@ -112,13 +112,6 @@ class JsonHandler(webapp.RequestHandler):
     def set_location_header(self, model):
         self.response.headers["Location"] = "{0}/{1}".format(self.request.path, model.key().id())
 
-    def api_root_path(self):
-        protocol = "http"
-        if os.environ.get("HTTPS") == "on":
-            protocol = "https"
-
-        return '{0}://{1}'.format(protocol, self.request.host)
-
     def handle_exception(self, exception, debug):
         import traceback
         import logging
@@ -169,7 +162,7 @@ class MetadataHandler(JsonHandler):
                 data.append(
                     {
                         'name': model,
-                        'url': '{0}{1}'.format(self.api_root_path(), self.app.model_url(model)),
+                        'url': '{0}{1}'.format(self.request.host_url, self.app.model_url(model)),
                         'metadata_url': '{0}/metadata'.format(self.app.model_url(model))
                     }
                 )
@@ -334,10 +327,12 @@ class SearchHandler(JsonHandler):
             'models': []
         }
         query = modelClass.all()
+        next_page_querystring = ''
         limit = 20
         for arg in self.request.arguments():
             match = QUERY_PATTERN.match(arg)
             if match:
+                next_page_querystring += "&{0}={1}".format(arg, self.request.get(arg))
                 query_type = match.group(1)
                 query_property = match.group(2)
                 operator = QUERY_EXPRS.get(query_type)
@@ -346,6 +341,7 @@ class SearchHandler(JsonHandler):
                 query.filter(operator.format(query_property), value)
                 continue
             if arg == 'order':
+                next_page_querystring += "&{0}={1}".format(arg, self.request.get(arg))
                 query.order(self.request.get(arg))
                 continue
             if arg == 'cursor':
@@ -354,6 +350,7 @@ class SearchHandler(JsonHandler):
             if arg == 'limit':
                 try:
                     limit = int(self.request.get(arg))
+                    next_page_querystring += "&{0}={1}".format(arg, self.request.get(arg))
                     continue
                 except ValueError:
                     raise errors.ApiFailureError('limit parameter must be an integer')
@@ -363,6 +360,8 @@ class SearchHandler(JsonHandler):
         data['cursor'] = None
         if len(models) == limit:
             data['cursor'] = query.cursor()
+            next_page_querystring += "&cursor=" + query.cursor()
+            data['next_page'] = "{0}{1}?{2}".format(self.request.host_url, self.request.path, next_page_querystring[1:])
         for model in models:
             data['models'].append(self.app.converter.read_model(model))
         self.api_success(data)

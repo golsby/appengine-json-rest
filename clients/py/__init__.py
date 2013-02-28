@@ -98,30 +98,30 @@ class JSONClient(object):
         self.model_name = model_name
         self.api_root = api_root
 
-    def create(self, data):
+    def api_url(self, id_=None):
         url = self.api_root + self.model_name
-        return self._call_json_api(url, payload_params=data, method='POST')
+        if id_:
+            url += '/' + str(id_)
+        return url
+
+    def create(self, data):
+        return self._call_json_api(self.api_url(), payload_params=data, method='POST')
 
     def read(self, id_):
-        url = '{0}{1}/{2}'.format(self.api_root, self.model_name, id_)
-        return self._call_json_api(url, method='GET')
+        return self._call_json_api(self.api_url(id_), method='GET')
 
     def update(self, id_, data):
-        url = '{0}{1}/{2}'.format(self.api_root, self.model_name, id_)
-        return self._call_json_api(url, payload_params=data, method='PUT')
+        return self._call_json_api(self.api_url(id_), payload_params=data, method='PUT')
 
     def delete(self, id_):
-        url = '{0}{1}/{2}'.format(self.api_root, self.model_name, id_)
-        return self._call_json_api(url, method='DELETE')
+        return self._call_json_api(self.api_url(id_), method='DELETE')
 
     def all(self):
         return Query(self)
 
     def search(self, querystring):
-        url = '{0}{1}/search'.format(self.api_root, self.model_name)
-
-        data = self._call_json_api(url, querystring=querystring)
-        return data['models'], data['cursor']
+        data = self._call_json_api(self.api_url("search"), querystring=querystring)
+        return data.get('models'), data.get('cursor'), data.get('next_page')
 
     def _call_json_api(self, api_path, query_params=None, payload_params=None, querystring=None, method='GET'):
         data = None
