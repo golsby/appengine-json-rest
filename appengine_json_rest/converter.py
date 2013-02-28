@@ -163,6 +163,9 @@ class DictionaryConverter(object):
     handlers.JsonHandler will convert between the dict format
     from this class and a JSON string.
     '''
+    def __init__(self, application):
+        self.application = application
+
     def __convert_property(self, direction, prop, value):
         if type(prop) is db.ListProperty:
             result = []
@@ -176,7 +179,10 @@ class DictionaryConverter(object):
 
     def _type_from_property(self, model, prop):
         value = getattr(model, prop.name)
-        return self.__convert_property(FROM_PROPERTY, prop, value)
+        rc = self.__convert_property(FROM_PROPERTY, prop, value)
+        if type(prop) is db.ReferenceProperty and rc:
+            rc['url'] = '{0}/{1}'.format(self.application.model_url(rc['model']), rc['id'])
+        return rc
 
     def _property_from_type(self, prop, value):
         return self.__convert_property(TO_PROPERTY, prop, value)

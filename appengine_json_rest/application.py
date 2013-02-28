@@ -7,6 +7,7 @@ import errors
 import logging
 import importlib
 from types import ModuleType
+import os
 
 
 class JSONApplication(WSGIApplication):
@@ -17,12 +18,12 @@ class JSONApplication(WSGIApplication):
     """
     def __init__(self, prefix, auth_func=None, require_https=False, models=None, model_modules=None, debug=False, config=None):
         routes = [
-            ('/%s/metadata/([^/]+)/?' % prefix, handlers.MetadataHandler),
             ('/%s/metadata/?' % prefix, handlers.MetadataHandler),
+            ('/%s/([^/]+)/metadata' % prefix, handlers.MetadataHandler),
             ('/%s/([^/]+)/search' % prefix, handlers.SearchHandler),
             ('/%s/([^/]+)/?' % prefix, handlers.SingleModelHandler),
             ('/%s/([^/]+)/([^/]+)/?' % prefix, handlers.SingleModelHandler),
-            ]
+        ]
 
         super(JSONApplication, self).__init__(routes, debug, config)
         self.require_https = require_https
@@ -30,7 +31,8 @@ class JSONApplication(WSGIApplication):
         self.__models_by_name = {}
         self.__models_by_type = {}
         self.__property_converters = {}
-        self.root_url = "/{0}".format(prefix)
+        self.__api_path = "/{0}".format(prefix)
+        self.converter = DictionaryConverter(self)
 
         if models:
             for model in models:
@@ -47,7 +49,7 @@ class JSONApplication(WSGIApplication):
 
         return obj.__module__ + '.' + obj.__name__
 
-    def register_model(self, model, converter=None, prefix_with_package_path=False):
+    def register_model(self, model, prefix_with_package_path=False):
         """
         Registers the given db.Model class with the REST API.
 
@@ -78,8 +80,8 @@ class JSONApplication(WSGIApplication):
                     logging.debug("Model already registered: " + self._full_path(model))
                     return  # Don't error if we're importing the same model with the same name.
                 raise KeyError('Model with name {0} already registered'.format(model_name))
-            self.__models_by_name[model_name] = (model, converter or DictionaryConverter())
-            self.__models_by_type[model] = (model_name, converter or DictionaryConverter())
+            self.__models_by_name[model_name] = model
+            self.__models_by_type[model] = model_name
 
     def register_models_from_module(self, model_module, prefix_with_package_path=False, exclude_model_types=None, recurse=False):
         """
@@ -119,6 +121,12 @@ class JSONApplication(WSGIApplication):
 
             self.register_model(obj, prefix_with_package_path=prefix_with_package_path)
 
+    def model_url(self, model):
+        protocol = 'http'
+        if os.environ.get('HTTPS') == 'on':
+            protocol = 'https'
+        return '{0}://{1}{2}/{3}'.format(protocol, self.request.host, self.__api_path, model)
+
     def get_registered_model_names(self):
         names = []
         for model_names in self.__models_by_name:
@@ -126,21 +134,21 @@ class JSONApplication(WSGIApplication):
         return names
 
     def get_registered_model_type(self, model_name):
-        (model_class, converter) = self.__models_by_name.get(model_name, (None, None))
+        model_class = self.__models_by_name.get(model_name, None)
         if not model_class:
             raise errors.ModelNotRegisteredError(model_name)
 
-        return model_class, converter
+        return model_class
 
     def get_registered_name(self, model_obj):
-        (model_name, converter) = self.__models_by_type.get(model_obj, (None, None))
+        model_name = self.__models_by_type.get(model_obj, None)
         if not model_name:
             raise errors.ModelNotRegisteredError(model_obj.__name__)
 
         return model_name
 
     def get_registered_model_instance(self, model_name, key):
-        (model_class, converter) = self.get_registered_model_type(model_name)
+        model_class = self.get_registered_model_type(model_name)
 
         try:
             id_ = int(key)
@@ -156,4 +164,4 @@ class JSONApplication(WSGIApplication):
             except:
                 raise errors.ObjectMissingError('{0} with key {1} not found'.format(model_name, key))
 
-        return model, converter
+        return model
