@@ -61,8 +61,6 @@ class Query(object):
     }
 
     def __init__(self, client, querystring=None):
-        if type(client) != JSONClient:
-            raise ValueError("client must be a JSONClient instance")
         self.__client = client
         self.__params = []
         self.__data_was_fetched = False
@@ -75,8 +73,8 @@ class Query(object):
         Returns:
             self to support method chaining
         """
-        if self.__querystring:
-            raise QueryLockedError("This query is locked and cannot be modified.")
+        if self.__data_was_fetched:
+            raise QueryLockedError("Query objects cannot be reused, except to call fetch() multiple times when paging through recordsets.")
 
         if not ' ' in expression:
             raise OperatorNotFoundError("Operator not found in expression '{0}'. (Are you missing a space between the property name and the operator?)".format(expression))
@@ -91,8 +89,8 @@ class Query(object):
         return self
 
     def order(self, prop, descending=False):
-        if self.__querystring:
-            raise QueryLockedError("This query is locked and cannot be modified.")
+        if self.__data_was_fetched:
+            raise QueryLockedError("Query objects cannot be reused, except to call fetch() multiple times when paging through recordsets.")
 
         if descending:
             self.__params.append(('order', '-' + prop))
@@ -101,8 +99,8 @@ class Query(object):
         return self
 
     def with_cursor(self, cursor):
-        if self.__querystring:
-            raise QueryLockedError("This query is locked and cannot be modified.")
+        if self.__data_was_fetched:
+            raise QueryLockedError("Query objects cannot be reused, except to call fetch() multiple times when paging through recordsets.")
 
         self.__params.append(('cursor', cursor))
         return self
@@ -148,12 +146,17 @@ class JSONClient(object):
     """
     JSONClient provides methods to Create, Read, Update, and Delete individual models from the remote API.
     """
-    def __init__(self, model_name, api_root, headers=None, username=None, password=None):
-        self.username = username
-        self.password = password
-        self.headers = headers or {}
+    def __init__(self, model_name, api_root):
+        self.headers = {}
         self.model_name = model_name
         self.api_root = api_root
+
+    def authenticate(self):
+        """
+        Override this method in a base class to perform appropriate authentication handshake and set
+        authenticated headers.
+        """
+        pass
 
     def api_url(self, id_=None):
         url = self.api_root + self.model_name
@@ -208,6 +211,8 @@ class JSONClient(object):
         """
         Low-level method to package up query string, post data, and make the appropriate HTTP REST API call.
         """
+        self.authenticate()
+
         data = None
         if payload_params:
             data = json.dumps(payload_params)
@@ -226,8 +231,6 @@ class JSONClient(object):
             'Content-Type': 'application/json, charset=utf-8',
         }
         headers.update(self.headers)
-        if self.username and self.password:
-            headers['Authorization'] = "Basic " + base64.b64encode('{0}:{1}'.format(self.username, self.password))
 
         request = urllib2.Request(url, data, headers)
         request.get_method = lambda: method
@@ -277,5 +280,17 @@ class JSONClient(object):
                 else:
                     utf8_encoded[utf8key] = unicode(value).encode('utf-8')
         return urllib.urlencode(utf8_encoded, doseq=True)
+
+
+class BasicAuthJSONClient(JSONClient):
+    def __init__(self, model_name, api_root, username=None, password=None):
+        super(BasicAuthJSONClient, self).__init__(model_name, api_root)
+        self.username = username
+        self.password = password
+
+    def authenticate(self):
+        if self.username and self.password:
+            self.headers['Authorization'] = "Basic " + base64.b64encode('{0}:{1}'.format(self.username, self.password))
+
 
 

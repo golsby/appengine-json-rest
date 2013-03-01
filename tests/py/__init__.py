@@ -1,6 +1,7 @@
 import unittest
 import uuid
-from appengine_json_rest.clients.py import JSONClient, ForbiddenError, ObjectMissingError, Query, AuthenticationRequiredError
+from appengine_json_rest.clients.py import JSONClient, BasicAuthJSONClient
+from appengine_json_rest.clients.py import ForbiddenError, ObjectMissingError, AuthenticationRequiredError
 
 
 # These tests are designed to work with the sample
@@ -22,7 +23,7 @@ class TestSimpleApi(unittest.TestCase):
             self.assertEqual(bigger.get(key), smaller.get(key))
 
     def test_delete_all_fruit(self):
-        #self.skipTest("Performance")
+        # self.skipTest("Performance")
         limit = 10
         Fruit = JSONClient("Fruit", api_root)
         Q = Fruit.all()
@@ -36,7 +37,7 @@ class TestSimpleApi(unittest.TestCase):
         self.assertFalse(fruits, "There should be no fruits after running test_delete_all_fruit")
 
     def test_CRUD(self):
-        #self.skipTest("Performance")
+        # self.skipTest("Performance")
         basket = {
             "location": {"lat": 10, "lon": 5}
         }
@@ -125,16 +126,16 @@ class TestAuthApi(unittest.TestCase):
     def test_auth(self):
         #self.skipTest("Performance")
         # Server expects HTTP Basic Authentication
-        AuthFruit = JSONClient('Fruit', auth_api_root, username='naive', password='pa$sw0rd')
+        AuthFruit = BasicAuthJSONClient('Fruit', auth_api_root, username='naive', password='pa$sw0rd')
         fruits = AuthFruit.all().fetch()
 
         # Server expects basic authentication; should raise HTTP 401 error
         # if no authentication information is passed.
-        NoAuthFruit = JSONClient('Fruit', auth_api_root)
+        NoAuthFruit = BasicAuthJSONClient('Fruit', auth_api_root)
         self.assertRaises(AuthenticationRequiredError, NoAuthFruit.all().fetch)
 
         # Incorrect credentials should raise HTTP 401 error
-        NoAuthFruit = JSONClient('Fruit', auth_api_root, username='incorrect', password='wrong')
+        NoAuthFruit = BasicAuthJSONClient('Fruit', auth_api_root, username='incorrect', password='wrong')
         self.assertRaises(ForbiddenError, NoAuthFruit.all().fetch)
 
 
