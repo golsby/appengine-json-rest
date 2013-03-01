@@ -49,6 +49,7 @@ def authenticate(function):
                 return
             except errors.ForbiddenError:
                 self.error(403)
+                return
 
         return function(*args, **kwargs)
     return decorated
