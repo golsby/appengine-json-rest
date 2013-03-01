@@ -2,6 +2,7 @@ import json
 import os
 import re
 import logging
+import webapp2
 
 from google.appengine.ext import webapp
 
@@ -31,13 +32,13 @@ def authenticate(function):
     def decorated(*args, **kwargs):
         self = args[0]
         localhost = self.request.host.startswith('localhost')
-        if self.app.require_https and not localhost:
+        if webapp2.get_app().require_https and not localhost:
             if os.environ.get("HTTPS") != 'on':
                 raise errors.HttpsRequiredError()
 
-        if self.app.authenticator:
+        if webapp2.get_app().authenticator:
             try:
-                self.app.authenticator(self.request)
+                webapp2.get_app().authenticator(self.request)
             except errors.AuthenticationRequiredError as exception:
                 if not exception.headers or not exception.headers.get('WWW-Authenticate'):
                     # A WWW-Authenticate header is required; without it the negotiation for authentication fails.
@@ -83,12 +84,6 @@ class JsonHandler(webapp.RequestHandler):
             self.indent = 4
         else:
             self.indent = None
-
-    #@requires_authentication
-    #def authenticate_caller(self):
-    #    '''Call this function if you want to have control over the response when the user is not authenticated.
-    #    It's easier to wrap your get, post, put, head, delete methods with @requires_authentication.'''
-    #    pass
 
     def __render_json(self, data):
         self.response.write(json.dumps(data, indent=self.indent))
@@ -153,18 +148,18 @@ class MetadataHandler(JsonHandler):
     @authenticate
     def get(self, modelName=None):
         if modelName:
-            modelClass = self.app.get_registered_model_type(modelName)
-            metadata = self.app.converter.metadata(modelClass)
+            modelClass = webapp2.get_app().get_registered_model_type(modelName)
+            metadata = webapp2.get_app().converter.metadata(modelClass)
             self.api_success(metadata)
         else:
-            models = self.app.get_registered_model_names()
+            models = webapp2.get_app().get_registered_model_names()
             data = []
             for model in models:
                 data.append(
                     {
                         'name': model,
-                        'url': '{0}{1}'.format(self.request.host_url, self.app.model_url(model)),
-                        'metadata_url': '{0}/metadata'.format(self.app.model_url(model))
+                        'url': '{0}{1}'.format(self.request.host_url, webapp2.get_app().model_url(model)),
+                        'metadata_url': '{0}/metadata'.format(webapp2.get_app().model_url(model))
                     }
                 )
             self.api_success(data)
@@ -188,8 +183,8 @@ class SingleModelHandler(JsonHandler):
             }
         }
         """
-        model = self.app.get_registered_model_instance(modelName, key)
-        self.api_success(self.app.converter.read_model(model))
+        model = webapp2.get_app().get_registered_model_instance(modelName, key)
+        self.api_success(webapp2.get_app().converter.read_model(model))
 
     @authenticate
     def post(self, modelName):
@@ -211,15 +206,15 @@ class SingleModelHandler(JsonHandler):
         See the description if id() for details:
         https://developers.google.com/appengine/docs/python/datastore/keyclass#Key_id
         """
-        model_class = self.app.get_registered_model_type(modelName)
+        model_class = webapp2.get_app().get_registered_model_type(modelName)
         import urllib
         json_string = urllib.unquote(self.request.body)
         values = json.loads(json_string)
 
-        model = self.app.converter.create_model(model_class, values)
+        model = webapp2.get_app().converter.create_model(model_class, values)
         self.response.set_status(201)
         self.set_location_header(model)
-        self.api_success(self.app.converter.read_model(model))
+        self.api_success(webapp2.get_app().converter.read_model(model))
 
     @authenticate
     def put(self, modelName, key):
@@ -239,14 +234,14 @@ class SingleModelHandler(JsonHandler):
 
         Where key is the passed-in parameter
         """
-        model = self.app.get_registered_model_instance(modelName, key)
+        model = webapp2.get_app().get_registered_model_instance(modelName, key)
         import urllib
         json_string = urllib.unquote(self.request.body)
         values = json.loads(json_string)
 
-        model = self.app.converter.update_model(model, values)
+        model = webapp2.get_app().converter.update_model(model, values)
         self.set_location_header(model)
-        self.api_success(self.app.converter.read_model(model))
+        self.api_success(webapp2.get_app().converter.read_model(model))
 
     @authenticate
     def delete(self, modelName, key):
@@ -261,7 +256,7 @@ class SingleModelHandler(JsonHandler):
 
         Where key is the passed-in parameter
         """
-        model = self.app.get_registered_model_instance(modelName, key)
+        model = webapp2.get_app().get_registered_model_instance(modelName, key)
         model.delete()
         try:
             id_ = int(key)
@@ -320,7 +315,7 @@ class SearchHandler(JsonHandler):
     @authenticate
     def get(self, model_name):
         try:
-            modelClass = self.app.get_registered_model_type(model_name)
+            modelClass = webapp2.get_app().get_registered_model_type(model_name)
         except TypeError:
             raise errors.ModelNotRegisteredError(model_name)
 
@@ -338,7 +333,7 @@ class SearchHandler(JsonHandler):
                 query_property = match.group(2)
                 operator = QUERY_EXPRS.get(query_type)
                 prop = modelClass._properties.get(query_property)
-                value = self.app.converter._property_from_type(prop, self.request.get(arg))
+                value = webapp2.get_app().converter._property_from_type(prop, self.request.get(arg))
                 query.filter(operator.format(query_property), value)
                 continue
             if arg == 'order':
@@ -364,5 +359,5 @@ class SearchHandler(JsonHandler):
             next_page_querystring += "&cursor=" + query.cursor()
             data['next_page'] = "{0}{1}?{2}".format(self.request.host_url, self.request.path, next_page_querystring[1:])
         for model in models:
-            data['models'].append(self.app.converter.read_model(model))
+            data['models'].append(webapp2.get_app().converter.read_model(model))
         self.api_success(data)
