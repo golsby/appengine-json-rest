@@ -25,20 +25,18 @@ class TestSimpleApi(unittest.TestCase):
         #self.skipTest("Performance")
         limit = 10
         Fruit = JSONClient("Fruit", api_root)
-        fruits, next_page = Fruit.all().fetch(limit)
-        for fruit in fruits:
-            Fruit.delete(fruit['id'])
-
-        while next_page:
-            fruits, next_page = next_page.fetch(limit)
+        Q = Fruit.all()
+        fruits = Q.fetch(limit)
+        while fruits:
             for fruit in fruits:
                 Fruit.delete(fruit['id'])
+            fruits = Q.fetch()
 
-        fruits, next_page = Fruit.all().fetch()
+        fruits = Fruit.all().fetch()
         self.assertFalse(fruits, "There should be no fruits after running test_delete_all_fruit")
 
     def test_CRUD(self):
-        self.skipTest("Performance")
+        #self.skipTest("Performance")
         basket = {
             "location": {"lat": 10, "lon": 5}
         }
@@ -101,34 +99,34 @@ class TestSimpleApi(unittest.TestCase):
 
         # Make sure we get create_count models back
         Q = F.all().filter('name =', name1).order('created_datetime', descending=True)
-        (models, next_query) = Q.fetch(limit)
+        models = Q.fetch(limit)
         self.assertEquals(len(models), create_count)
 
         # Make sure we get a cursor when fetching less than all of them
         Q = F.all().filter('name =', name1).order('created_datetime', descending=True)
-        (models, next_query) = Q.fetch(create_count / 3)
-        self.assertNotEqual(next_query, None)
+        models = Q.fetch(create_count / 3)
+        self.assertNotEqual(len(models), 0)
 
-        while next_query:
-            models, next_query = next_query.fetch()
+        while models:
+            models = Q.fetch()
 
         # Clean up
         for model in created_models:
             F.delete(model.get('id'))
 
         # Make sure none are left:
-        models, next_query = F.all().filter('name =', name1).fetch()
+        models = F.all().filter('name =', name1).fetch()
         self.assertEqual(len(models), 0)
-        models, next_query = F.all().filter('name =', name2).fetch()
+        models = F.all().filter('name =', name2).fetch()
         self.assertEqual(len(models), 0)
 
 
 class TestAuthApi(unittest.TestCase):
     def test_auth(self):
-        self.skipTest("Performance")
+        #self.skipTest("Performance")
         # Server expects HTTP Basic Authentication
         AuthFruit = JSONClient('Fruit', auth_api_root, username='naive', password='pa$sw0rd')
-        fruits, cursor, next_url = AuthFruit.all().fetch()
+        fruits = AuthFruit.all().fetch()
 
         # Server expects basic authentication; should raise HTTP 401 error
         # if no authentication information is passed.

@@ -30,6 +30,27 @@ class OperatorNotFoundError(Exception):
 
 
 class Query(object):
+    """
+    The Query object provides methods to create api search
+    queries without having to form the HTTP querystring manually.
+
+    Methods:
+        * filter: specify search terms to limit results.
+            You must restrict your filters to be compatible with the indexes available on AppEngine.
+        * order: specify a property used to order results.
+        * with_cursor: specify a cursor used previously with the same order and filter to fetch additional results.
+        * fetch: fetch data from the remote API. Fetch returns a list of models, or None when no models are available.
+            If the remote API returns a cursor, indicating that more results are available, fetch will store that
+            cursor and use it for subsequent calls.
+
+    Usage:
+        client = JSONClient("ModelName", "http://host/rest")
+        query = client.all().filter("name =", "Fred").filter("age <", 65).order("age", descending=True)
+        models = query.fetch(10)
+        while models:
+            # do something with models
+            models = query.fetch()  # fetch next batch of models
+    """
     FILTER_METHODS = {
         '=': 'feq_',
         '>': 'fgt_',
@@ -40,9 +61,12 @@ class Query(object):
     }
 
     def __init__(self, client, querystring=None):
-        self.client = client
-        self.params = []
-        self.querystring = querystring
+        if type(client) != JSONClient:
+            raise ValueError("client must be a JSONClient instance")
+        self.__client = client
+        self.__params = []
+        self.__data_was_fetched = False
+        self.__querystring = querystring
 
     def filter(self, expression, value):
         """
@@ -51,7 +75,7 @@ class Query(object):
         Returns:
             self to support method chaining
         """
-        if self.querystring:
+        if self.__querystring:
             raise QueryLockedError("This query is locked and cannot be modified.")
 
         if not ' ' in expression:
@@ -60,27 +84,27 @@ class Query(object):
         (prop, operator) = expression.split(' ')
         prefix = Query.FILTER_METHODS.get(operator)
         if prefix:
-            self.params.append(('{0}{1}'.format(prefix, prop), value))
+            self.__params.append(('{0}{1}'.format(prefix, prop), value))
         else:
             raise OperatorNotFoundError('Unsupported operator: ' + operator)
 
         return self
 
     def order(self, prop, descending=False):
-        if self.querystring:
+        if self.__querystring:
             raise QueryLockedError("This query is locked and cannot be modified.")
 
         if descending:
-            self.params.append(('order', '-' + prop))
+            self.__params.append(('order', '-' + prop))
         else:
-            self.params.append(('order', prop))
+            self.__params.append(('order', prop))
         return self
 
     def with_cursor(self, cursor):
-        if self.querystring:
+        if self.__querystring:
             raise QueryLockedError("This query is locked and cannot be modified.")
 
-        self.params.append(('cursor', cursor))
+        self.__params.append(('cursor', cursor))
         return self
 
     def fetch(self, limit=None):
@@ -90,25 +114,30 @@ class Query(object):
             except TypeError:
                 raise ValueError('limit must be an int')
 
-            self.params.append(('limit', limit))
+            self.__params.append(('limit', limit))
 
-        if self.querystring:
-            querystring = self.querystring
+        if self.__querystring:
+            querystring = self.__querystring
         else:
+            if self.__data_was_fetched:
+                return []
+
             querystring = ''
-            for (key, value) in self.params:
+            for (key, value) in self.__params:
                 if querystring:
                     querystring += "&"
                 querystring += "{0}={1}".format(self.encode(key), self.encode(value))
 
-        (models, cursor, next_page) = self.client.search(querystring)
-        next_query = None
+        (models, cursor, next_page) = self.__client.search(querystring)
+        self.__data_was_fetched = True
         if cursor:
             querystring = re.sub('cursor=[^?&]+&?', '', querystring)
             querystring = querystring.rstrip('&')
             querystring += '&cursor=' + cursor
-            next_query = Query(self.client, querystring)
-        return models, next_query
+            self.__querystring = querystring
+        else:
+            self.__querystring = None
+        return models
 
     def encode(self, s):
         utf8 = unicode(s).encode('utf-8')
@@ -116,6 +145,9 @@ class Query(object):
 
 
 class JSONClient(object):
+    """
+    JSONClient provides methods to Create, Read, Update, and Delete individual models from the remote API.
+    """
     def __init__(self, model_name, api_root, headers=None, username=None, password=None):
         self.username = username
         self.password = password
@@ -130,25 +162,52 @@ class JSONClient(object):
         return url
 
     def create(self, data):
-        return self._call_json_api(self.api_url(), payload_params=data, method='POST')
+        """Create a new instance of Model. Uses HTTP POST."""
+        return self.__call_json_api(self.api_url(), payload_params=data, method='POST')
 
     def read(self, id_):
-        return self._call_json_api(self.api_url(id_), method='GET')
+        """
+        Get an existing instance of a Model. Uses HTTP GET.
+        Parameters:
+          id_: Model.key().id()
+        """
+        return self.__call_json_api(self.api_url(id_), method='GET')
 
     def update(self, id_, data):
-        return self._call_json_api(self.api_url(id_), payload_params=data, method='PUT')
+        """
+        Update an existing instance of a Model. Uses HTTP PUT.
+        Parameters:
+          id_: Model.key().id()
+        """
+        return self.__call_json_api(self.api_url(id_), payload_params=data, method='PUT')
 
     def delete(self, id_):
-        return self._call_json_api(self.api_url(id_), method='DELETE')
+        """
+        Delete an existing instance of a Model. Uses HTTP DELETE.
+        Parameters:
+          id_: Model.key().id()
+        """
+        return self.__call_json_api(self.api_url(id_), method='DELETE')
 
     def all(self):
+        """
+        Return a Query instance that can be used to search for instances of this Model.
+        """
         return Query(self)
 
     def search(self, querystring):
-        data = self._call_json_api(self.api_url("search"), querystring=querystring)
+        """
+        Returns ([models], cursor, next_page_url)
+
+        It's much easier to use the Query class to deal with the results for you.
+        """
+        data = self.__call_json_api(self.api_url("search"), querystring=querystring)
         return data.get('models'), data.get('cursor'), data.get('next_page')
 
-    def _call_json_api(self, api_path, query_params=None, payload_params=None, querystring=None, method='GET'):
+    def __call_json_api(self, api_path, query_params=None, payload_params=None, querystring=None, method='GET'):
+        """
+        Low-level method to package up query string, post data, and make the appropriate HTTP REST API call.
+        """
         data = None
         if payload_params:
             data = json.dumps(payload_params)
