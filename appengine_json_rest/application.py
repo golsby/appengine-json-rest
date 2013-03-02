@@ -76,7 +76,7 @@ class JSONApplication(WSGIApplication):
 
             already_registered_model = self.__models_by_name.get(model_name)
             if already_registered_model:
-                if self._full_path(already_registered_model[0]) == self._full_path(model):
+                if self._full_path(already_registered_model) == self._full_path(model):
                     logging.debug("Model already registered: " + self._full_path(model))
                     return  # Don't error if we're importing the same model with the same name.
                 raise KeyError('Model with name {0} already registered'.format(model_name))
