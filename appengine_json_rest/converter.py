@@ -193,8 +193,22 @@ class DictionaryConverter(object):
             'key': str(model.key()),
             'id': model.key().id()
         }
+        # Add ordinary properties
         for name, prop in model._properties.iteritems():
             result[name] = self._type_from_property(model, prop)
+
+        model_type = type(model)
+
+        # Provide Query URL for reference properties
+        for name in dir(model):
+            obj = getattr(model, name)
+            if type(obj) is db.Query:
+                refprop_class = obj._model_class
+                refprop_class_name = self.application.get_registered_name(refprop_class)
+                url = self.application.model_url(refprop_class_name) + "/search"
+                refprop_name = getattr(model_type, name)._prop_name
+                url += "?ref_{0}={1}".format(refprop_name, model.key().id())
+                result[name] = {'query': url}
         return result
 
     # HTTP PUT (update), Idempotent

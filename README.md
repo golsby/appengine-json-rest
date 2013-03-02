@@ -32,8 +32,15 @@ Usage:
     * URL: /rest/ModelName/id
   * Search for and page through model:
     * Method: HTTP GET
-    * URL: /rest/ModelName/search
-    * QueryString Parameters:
+    * URL: /rest/<ModelName>/search
+    * Query String Parameters:
+      * ref_<property>=<id> - Limit results to <ModelName> instances with ReferenceProperty <property> of ID <id>
+      * fgt_<property>=<value> - Limit results to <ModelName> instances with <property> greater than <value>
+      * feq_<property>=<value> - Limit results to <ModelName> instances with <property> equal to <value>
+      * flt_<property>=<value> - Limit results to <ModelName> instances with <property> less than <value>
+      * fle_<property>=<value> - Limit results to <ModelName> instances with <property> less than or equal to <value>
+      * fge_<property>=<value> - Limit results to <ModelName> instances with <property> greater than or equal to <value>
+      * fne_<property>=<value> - Limit results to <ModelName> instances with <property> not equal to <value>
   * List names of available models:
     * Method: HTTP GET
     * URL: /rest/metadata

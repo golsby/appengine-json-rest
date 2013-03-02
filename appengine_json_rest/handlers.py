@@ -325,6 +325,23 @@ class SearchHandler(JsonHandler):
         query = modelClass.all()
         next_page_querystring = ''
         limit = 20
+
+        # Handle Property References
+        for arg in self.request.arguments():
+            if arg.startswith('ref_'):
+                ref_prop_name = arg[4:]
+                ref_id = self.request.get(arg)
+                ref_prop = getattr(modelClass, ref_prop_name)
+                collection_name = ref_prop.collection_name
+                ref_class = ref_prop.data_type
+                instance = ref_class.get_by_id(int(ref_id))
+                if not instance:
+                    raise errors.ObjectMissingError("ReferenceProperty '{0}' with id {1} does not exist.".format(ref_prop_name, ref_id))
+
+                query = getattr(instance, collection_name)
+                break
+
+        # Parse other arguments
         for arg in self.request.arguments():
             match = QUERY_PATTERN.match(arg)
             if match:
